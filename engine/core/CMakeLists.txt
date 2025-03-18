@@ -12,6 +12,10 @@ SET(files_core
 	cvar.h
 	cvar.cc
 	idpool.h
+	pool.h
+	pool.cc
+	entity.h
+	entity.cc
 	)
 SOURCE_GROUP("core" FILES ${files_core})
 	
