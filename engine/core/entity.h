@@ -1,10 +1,25 @@
 #pragma once
 
+#include "ecs_types.h"
+
+#include <queue>
+
 namespace Ecs {
 
-	using EntityID = std::uint32_t;
-	using ComponentID = std::uint8_t;
+	class EntityManager {
+	public:
+		EntityManager();
+		~EntityManager();
 
-	constexpr EntityID MaxEntityCount = 1000;
+		EntityID CreateEntity();
+		void DestroyEntity(EntityID id);
+
+		Signature GetSignature(EntityID id) const;
+		void SetSignature(EntityID id, Signature sig);
+
+	private:
+		std::priority_queue<EntityID> m_freeEntities;
+		std::vector<Signature> m_signatures;
+	};
 
 } // namespace Ecs

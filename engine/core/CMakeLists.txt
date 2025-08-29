@@ -16,6 +16,11 @@ SET(files_core
 	pool.cc
 	entity.h
 	entity.cc
+    system.h
+    world.h
+    component.h
+    component.cc
+    ecs_types.h
 	)
 SOURCE_GROUP("core" FILES ${files_core})
 	
