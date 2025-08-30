@@ -17,7 +17,9 @@ SET(files_core
 	entity.h
 	entity.cc
     system.h
+    system.cc
     world.h
+    world.cc
     component.h
     component.cc
     ecs_types.h

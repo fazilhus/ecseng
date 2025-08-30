@@ -20,6 +20,7 @@ namespace Ecs {
 		}
 
 		auto res = this->m_freeEntities.top();
+		m_entities.push_back(res);
 		this->m_freeEntities.pop();
 		return res;
 	}
@@ -28,7 +29,7 @@ namespace Ecs {
 		assert(id < MaxEntityCount);
 
 		this->m_freeEntities.push(id);
-		m_signatures[id].reset();
+		m_signatures[id] = 0;
 	}
 
 	Signature EntityManager::GetSignature(EntityID id) const {

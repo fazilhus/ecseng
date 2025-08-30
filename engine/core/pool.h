@@ -8,6 +8,8 @@ namespace Ecs {
 	class BaseComponentPool {
 	public:
 		virtual ~BaseComponentPool() {}
+
+		virtual bool Remove(EntityID id) { return false; }
 	};
 
 	template<typename Comp>
@@ -25,11 +27,12 @@ namespace Ecs {
 
 		bool Has(EntityID id) const;
 
-		const Comp& GetComponent(EntityID id) const;
+		const Comp& Get(EntityID id) const;
+		Comp& Get(EntityID id);
 
 		template <typename ...Args>
 		void Add(EntityID id, Args... args);
-		void Remove(EntityID id);
+		bool Remove(EntityID id) override;
 		void Clear();
 
 		struct Iterator {
@@ -70,8 +73,13 @@ namespace Ecs {
 	}
 
 	template<typename Comp>
-	inline const Comp& ComponentPool<Comp>::GetComponent(EntityID id) const {
+	inline const Comp& ComponentPool<Comp>::Get(EntityID id) const {
 		if (!Has(id)) return Comp{};
+		return comps[sparse[id]];
+	}
+
+	template<typename Comp>
+	inline Comp& ComponentPool<Comp>::Get(EntityID id) {
 		return comps[sparse[id]];
 	}
 
@@ -86,21 +94,22 @@ namespace Ecs {
 	}
 
 	template<typename Comp>
-	inline void ComponentPool<Comp>::Remove(EntityID id) {
-		if (!Has(id)) return;
+	inline bool ComponentPool<Comp>::Remove(EntityID id) {
+		if (!Has(id)) return false;
 
 		EntityID di = sparse[id];
 		EntityID si = dense[di];
 
 		if (di == size - 1) {
 			size--;
-			return;
+			return true;
 		}
 
 		std::swap(dense[di], dense[size - 1]);
 		std::swap(comps[di], comps.back());
 		sparse[si] = di;
 		size--;
+		return true;
 	}
 
 	template<typename Comp>

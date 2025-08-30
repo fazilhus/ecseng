@@ -19,6 +19,7 @@ namespace Ecs {
 
 	private:
 		std::priority_queue<EntityID> m_freeEntities;
+		std::vector<EntityID> m_entities;
 		std::vector<Signature> m_signatures;
 	};
 
