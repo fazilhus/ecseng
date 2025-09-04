@@ -9,7 +9,7 @@ namespace Ecs {
         AddComponent<CameraComponent, CT_CAMERA>(eid);
 
         eid = CreateEntity();
-        AddComponent<MeshComponent, CT_MESH>(eid);
+        AddComponent<ModelComponent, CT_MODEL>(eid);
         AddComponent<TransformComponent, CT_TRANSFORM>(eid);
     }
 

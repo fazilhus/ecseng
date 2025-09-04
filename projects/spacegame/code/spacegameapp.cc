@@ -69,6 +69,9 @@ namespace Game {
         int w;
         int h;
         this->window->GetSize(w, h);
+
+        this->world = new Ecs::World{};
+
         glm::mat4 projection = glm::perspective(glm::radians(90.0f), float(w) / float(h), 0.01f, 1000.f);
         Camera* cam = CameraManager::GetCamera(CAMERA_MAIN);
         cam->projection = projection;
@@ -171,7 +174,6 @@ namespace Game {
         std::clock_t c_start = std::clock();
         double dt = 0.01667f;
 
-        world = new Ecs::World{};
         world->Start();
 
         // game loop

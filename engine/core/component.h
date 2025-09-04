@@ -6,18 +6,28 @@
 #include <typeinfo>
 #include <unordered_map>
 
+#include "render/physics.h"
+#include "render/renderdevice.h"
+
 
 namespace Ecs {
     struct TransformComponent {};
 
     struct CameraComponent {};
 
-    struct MeshComponent {};
+    struct ModelComponent {
+        Render::ModelId model_id;
+    };
+
+    struct PhysicsComponent {
+        Physics::ColliderMeshId mesh_id;
+        Physics::ColliderId collider_id;
+    };
 
     template <typename ...Components>
     struct ComponentGroup {};
 
-    using AllComponents = ComponentGroup<TransformComponent, CameraComponent, MeshComponent>;
+    using AllComponents = ComponentGroup<TransformComponent, CameraComponent, ModelComponent, PhysicsComponent>;
 
     class ComponentsManager {
     public:

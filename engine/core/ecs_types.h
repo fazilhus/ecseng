@@ -14,7 +14,8 @@ namespace Ecs {
     enum ComponentTypes {
         CT_TRANSFORM = 1 << 0,
         CT_CAMERA = 1 << 1,
-        CT_MESH = 1 << 2,
+        CT_MODEL = 1 << 2,
+        CT_PHYSICS = 1 << 3,
         CT_MAX = 1 << 31,
     };
 

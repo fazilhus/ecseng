@@ -38,24 +38,20 @@ namespace Ecs {
             : BaseSystemInt() {}
 
         virtual void Start(const std::vector<EntityID>& entities) override {
-            for (auto e: entities) { std::cout << "RigidBodySystem::Start for entity: " << e << '\n'; }
         }
 
         virtual void Update(const std::vector<EntityID>& entities, double dt) override {
-            for (auto e: entities) { std::cout << "RigidBodySystem::Update for entity: " << e << '\n'; }
         }
     };
 
-    struct DrawableSystem : public BaseSystemInt<CT_TRANSFORM, CT_MESH> {
+    struct DrawableSystem : public BaseSystemInt<CT_TRANSFORM, CT_MODEL> {
         DrawableSystem()
             : BaseSystemInt() {}
 
         virtual void Start(const std::vector<EntityID>& entities) override {
-            for (auto e: entities) { std::cout << "DrawableSystem::Start for entity: " << e << '\n'; }
         }
 
         virtual void Draw(const std::vector<EntityID>& entities) override {
-            for (auto e: entities) { std::cout << "DrawableSystem::Draw for entity: " << e << '\n'; }
         }
     };
 
