@@ -4,3 +4,4 @@ bin/*.exe
 bin/*.pdb
 .idea
 *.ilk
+.clang-format

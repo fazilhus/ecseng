@@ -7,29 +7,30 @@
 */
 //------------------------------------------------------------------------------
 #include "core/app.h"
+#include "core/world.h"
 #include "render/window.h"
 
-namespace Game
-{
-class SpaceGameApp : public Core::App
-{
-public:
-	/// constructor
-	SpaceGameApp();
-	/// destructor
-	~SpaceGameApp();
 
-	/// open app
-	bool Open();
-	/// run app
-	void Run();
-	/// exit app
-	void Exit();
-private:
+namespace Game {
+    class SpaceGameApp : public Core::App {
+    public:
+        /// constructor
+        SpaceGameApp();
+        /// destructor
+        virtual ~SpaceGameApp() override;
 
-	/// show some ui things
-	void RenderUI();
+        /// open app
+        virtual bool Open() override;
+        /// run app
+        virtual void Run() override;
+        /// exit app
+        virtual void Exit() override;
 
-	Display::Window* window;
-};
+    private:
+        /// show some ui things
+        void RenderUI();
+
+        Display::Window* window;
+        Ecs::World* world;
+    };
 } // namespace Game

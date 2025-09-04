@@ -19,10 +19,10 @@
 #define N_PRINT_ATTRIBUTES
 #endif
 
-void n_printf(const char *, ...) N_PRINT_ATTRIBUTES;
+void n_printf(const char*, ...) N_PRINT_ATTRIBUTES;
 void n_error(const char*, ...) N_PRINT_ATTRIBUTES;
 void n_warning(const char*, ...) N_PRINT_ATTRIBUTES;
-void n_barf(const char *, const char *, int);
+void n_barf(const char*, const char*, int);
 void n_barf2(const char*, const char*, const char*, int);
 
 #if __NO_ASSERT__

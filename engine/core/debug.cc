@@ -10,12 +10,12 @@
 /**
     This function is called by n_assert() when the assertion fails.
 */
-void 
-n_barf(const char* exp, const char* file, int line)
-{
+void n_barf(const char* exp, const char* file, int line) {
     std::string msg = "*** ASSERTION ***\n";
     msg += file;
-    msg += "("; msg += line; msg += ")\n";
+    msg += "(";
+    msg += line;
+    msg += ")\n";
     msg += "expression: ";
     msg += exp;
     msg += "\n";
@@ -26,12 +26,12 @@ n_barf(const char* exp, const char* file, int line)
 /**
     This function is called by n_assert2() when the assertion fails.
 */
-void
-n_barf2(const char* exp, const char* msg, const char* file, int line)
-{
+void n_barf2(const char* exp, const char* msg, const char* file, int line) {
     std::string str = "*** ASSERTION ***\n";
     str += file;
-    str += "("; str += line; str += ")\n";
+    str += "(";
+    str += line;
+    str += ")\n";
     str += "expression: ";
     str += exp;
     str += "\n";
@@ -47,8 +47,7 @@ n_barf2(const char* exp, const char* msg, const char* file, int line)
     requires abortion of the application.
 */
 void __cdecl
-n_error(const char* msg, ...)
-{
+n_error(const char* msg, ...) {
     va_list argList;
     va_start(argList, msg);
     vprintf(msg, argList);
@@ -62,21 +61,19 @@ n_error(const char* msg, ...)
     require abortion of the application.
 */
 void __cdecl
-n_warning(const char* msg, ...)
-{
+n_warning(const char* msg, ...) {
     va_list argList;
     va_start(argList, msg);
     printf("[WARNING] ");
     vprintf(msg, argList);
     va_end(argList);
-}        
+}
 
 //------------------------------------------------------------------------------
 /**
 */
 void __cdecl
-n_printf(const char *msg, ...)
-{
+n_printf(const char* msg, ...) {
     va_list argList;
     va_start(argList, msg);
     vprintf(msg, argList);

@@ -1,18 +1,14 @@
 #pragma once
 
-namespace Render
-{
+namespace Render {
+    using ResourceId = unsigned int;
+    constexpr ResourceId InvalidResourceId = UINT_MAX;
 
-using ResourceId = unsigned int;
-constexpr ResourceId InvalidResourceId = UINT_MAX;
+    using ShaderResourceId = ResourceId;
+    using ShaderProgramId = ResourceId;
 
-using ShaderResourceId = ResourceId;
-using ShaderProgramId = ResourceId;
+    using ModelId = uint32_t;
+    using BrushGroupId = uint32_t;
 
-using ModelId = uint32_t;
-using BrushGroupId = uint32_t;
-
-using TextureResourceId = ResourceId;
-
-
+    using TextureResourceId = ResourceId;
 }

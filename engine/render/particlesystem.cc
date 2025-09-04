@@ -3,20 +3,24 @@
 #include "shaderresource.h"
 #include <algorithm>
 
-namespace Render
-{
-	void ParticleSystem::Initialize()
-	{
-        auto vs = Render::ShaderResource::LoadShader(Render::ShaderResource::ShaderType::VERTEXSHADER, "shd/vs_particles_bufstorage.glsl");
-        auto fs = Render::ShaderResource::LoadShader(Render::ShaderResource::ShaderType::FRAGMENTSHADER, "shd/fs_particles_bufstorage.glsl");
-        this->particleShaderId = Render::ShaderResource::CompileShaderProgram({ vs, fs });
-        auto cs = Render::ShaderResource::LoadShader(Render::ShaderResource::ShaderType::COMPUTESHADER, "shd/cs_particle_sim_bufstorage.glsl");
-        this->particleSimComputeShaderId = Render::ShaderResource::CompileShaderProgram({ cs });
+
+namespace Render {
+    void ParticleSystem::Initialize() {
+        auto vs = Render::ShaderResource::LoadShader(
+            Render::ShaderResource::ShaderType::VERTEXSHADER, "shd/vs_particles_bufstorage.glsl"
+        );
+        auto fs = Render::ShaderResource::LoadShader(
+            Render::ShaderResource::ShaderType::FRAGMENTSHADER, "shd/fs_particles_bufstorage.glsl"
+        );
+        this->particleShaderId = Render::ShaderResource::CompileShaderProgram({vs, fs});
+        auto cs = Render::ShaderResource::LoadShader(
+            Render::ShaderResource::ShaderType::COMPUTESHADER, "shd/cs_particle_sim_bufstorage.glsl"
+        );
+        this->particleSimComputeShaderId = Render::ShaderResource::CompileShaderProgram({cs});
         glGenBuffers(1, &this->emitterBlockUBO);
-	}
-    
-    ParticleEmitter::ParticleEmitter(uint32_t numParticles)
-    {
+    }
+
+    ParticleEmitter::ParticleEmitter(uint32_t numParticles) {
         data.numParticles = numParticles;
         glGenBuffers(2, this->bufPositions);
         glGenBuffers(2, this->bufVelocities);
@@ -36,20 +40,15 @@ namespace Render
         glBufferData(GL_SHADER_STORAGE_BUFFER, this->data.numParticles * sizeof(glm::vec4), NULL, GL_DYNAMIC_DRAW);
     }
 
-    ParticleEmitter::~ParticleEmitter()
-    {
+    ParticleEmitter::~ParticleEmitter() {
         glDeleteBuffers(2, this->bufPositions);
         glDeleteBuffers(2, this->bufVelocities);
         glDeleteBuffers(2, this->bufColors);
     }
 
-    void ParticleSystem::AddEmitter(ParticleEmitter* emitter)
-    {
-        this->emitters.push_back(emitter);
-    }
+    void ParticleSystem::AddEmitter(ParticleEmitter* emitter) { this->emitters.push_back(emitter); }
 
-    void ParticleSystem::RemoveEmitter(ParticleEmitter* emitter)
-    {
+    void ParticleSystem::RemoveEmitter(ParticleEmitter* emitter) {
         this->emitters.erase(std::find(this->emitters.begin(), this->emitters.end(), emitter));
     }
 }

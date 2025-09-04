@@ -4,7 +4,6 @@
 //------------------------------------------------------------------------------
 #include "config.h"
 #include "gamepad.h"
-namespace Input
-{
 
-} // namespace Input
+
+namespace Input {} // namespace Input

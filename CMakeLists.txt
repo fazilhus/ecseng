@@ -1,8 +1,8 @@
 #--------------------------------------------------------------------------
 # engine-lab-env
 #--------------------------------------------------------------------------
-PROJECT(engine-lab-env)
 CMAKE_MINIMUM_REQUIRED(VERSION 3.12)
+PROJECT(engine-lab-env)
 
 MACRO(TARGET_PCH target path)
 IF(WIN32)

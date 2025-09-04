@@ -4,23 +4,22 @@
 
 #include <queue>
 
+
 namespace Ecs {
+    class EntityManager {
+    public:
+        EntityManager();
+        ~EntityManager();
 
-	class EntityManager {
-	public:
-		EntityManager();
-		~EntityManager();
+        EntityID CreateEntity();
+        void DestroyEntity(EntityID id);
 
-		EntityID CreateEntity();
-		void DestroyEntity(EntityID id);
+        Signature GetSignature(EntityID id) const;
+        void SetSignature(EntityID id, Signature sig);
 
-		Signature GetSignature(EntityID id) const;
-		void SetSignature(EntityID id, Signature sig);
-
-	private:
-		std::priority_queue<EntityID> m_freeEntities;
-		std::vector<EntityID> m_entities;
-		std::vector<Signature> m_signatures;
-	};
-
+    private:
+        std::priority_queue<EntityID, std::vector<EntityID>, std::greater<EntityID>> m_freeEntities;
+        std::vector<EntityID> m_entities;
+        std::vector<Signature> m_signatures;
+    };
 } // namespace Ecs

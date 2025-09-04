@@ -29,24 +29,24 @@ typedef size_t index_t;
 typedef unsigned int uint;
 typedef unsigned short ushort;
 
-typedef uint64_t	uint64;
-typedef int64_t	    int64;
-typedef uint32_t	uint32;
-typedef int32_t		int32;
-typedef uint16_t	uint16;
-typedef int16_t		int16;
-typedef uint8_t		uint8;
-typedef int8_t		int8;
-typedef uint8_t		uchar;
+typedef uint64_t uint64;
+typedef int64_t int64;
+typedef uint32_t uint32;
+typedef int32_t int32;
+typedef uint16_t uint16;
+typedef int16_t int16;
+typedef uint8_t uint8;
+typedef int8_t int8;
+typedef uint8_t uchar;
 
 // eh, windows already defines byte, so don't redefine byte if we are running windows
 #ifndef __WIN32__
-typedef uint8_t      byte;
+typedef uint8_t byte;
 #endif
 
-typedef uint8_t		ubyte;
-typedef float		float32;
-typedef double		float64;
+typedef uint8_t ubyte;
+typedef float float32;
+typedef double float64;
 
 #define j_min(x, y) x < y ? x : y
 #define j_max(x, y) x > y ? x : y

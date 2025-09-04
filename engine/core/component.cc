@@ -4,17 +4,14 @@
 #include <iostream>
 #include <string>
 
+
 namespace Ecs {
+    ComponentsManager::ComponentsManager()
+        : m_nextComponentType(1) {
+        RegisterComponents(AllComponents{});
 
-	ComponentsManager::ComponentsManager() : m_nextComponentType(1) {
-		RegisterComponents(AllComponents{});
+        for (const auto& [k, v]: this->m_componentTypes) { std::cout << k << ' ' << std::to_string(v) << '\n'; }
+    }
 
-		for (const auto& [k, v] : this->m_componentTypes) {
-			std::cout << k << ' ' << std::to_string(v) << '\n';
-		}
-	}
-
-	ComponentsManager::~ComponentsManager() {
-	}
-
+    ComponentsManager::~ComponentsManager() { for (auto& [k, v]: m_components) { delete v; } }
 } // namespace Ecs

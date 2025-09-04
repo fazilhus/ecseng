@@ -10,21 +10,18 @@
 //------------------------------------------------------------------------------
 #include <GL/glew.h>
 
-namespace Render
-{
 
-class Grid
-{
-public:
-    Grid();
-    ~Grid();
-    
-    void Draw(float const* const viewProjection);
-    
-private:
-    GLuint program;
-    GLuint vao;
-    GLuint lineBuffer;
-};
+namespace Render {
+    class Grid {
+    public:
+        Grid();
+        ~Grid();
 
+        void Draw(float const* const viewProjection);
+
+    private:
+        GLuint program;
+        GLuint vao;
+        GLuint lineBuffer;
+    };
 } // namespace Render
