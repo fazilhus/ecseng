@@ -2,3 +2,5 @@
 .vscode
 bin/*.exe
 bin/*.pdb
+.idea
+*.ilk
