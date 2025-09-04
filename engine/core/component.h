@@ -77,7 +77,7 @@ namespace Ecs {
                 this->m_componentTypes.find(tname) != this->m_componentTypes.end() &&
                 "component not registered registered"
             );
-            return static_cast<ComponentPool<T>*>(this->m_components[tname]);
+            return static_cast<ComponentPool<T>*>(this->m_components.at(tname));
         }
 
         template <typename T>
