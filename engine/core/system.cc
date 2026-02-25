@@ -6,7 +6,7 @@ namespace Ecs {
     SystemsManager::SystemsManager() {
         RegisterSystems(AllSystems{});
 
-        for (const auto& [k, v]: this->m_systems) { std::cout << k << ' ' << typeid(v).name() << '\n'; }
+        for (const auto& [k, v]: this->m_systems) { std::cout << k.name() << ' ' << typeid(v).name() << '\n'; }
     }
 
     SystemsManager::~SystemsManager() { for (auto& [_, v]: this->m_systems) { delete v; } }

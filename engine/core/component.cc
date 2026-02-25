@@ -10,7 +10,7 @@ namespace Ecs {
         : m_nextComponentType(1) {
         RegisterComponents(AllComponents{});
 
-        for (const auto& [k, v]: this->m_componentTypes) { std::cout << k << ' ' << std::to_string(v) << '\n'; }
+        for (const auto& [k, v]: this->m_componentTypes) { std::cout << k.name() << ' ' << std::to_string(v) << '\n'; }
     }
 
     ComponentsManager::~ComponentsManager() { for (auto& [k, v]: m_components) { delete v; } }

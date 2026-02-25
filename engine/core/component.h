@@ -3,7 +3,7 @@
 #include "ecs_types.h"
 #include "pool.h"
 
-#include <typeinfo>
+#include <typeindex>
 #include <unordered_map>
 
 #include "render/physics.h"
@@ -36,17 +36,16 @@ namespace Ecs {
 
         template <typename T>
         ComponentID GetComponentType() const {
-            auto tname = typeid(T).name();
             assert(
-                this->m_componentTypes.find(tname) != this->m_componentTypes.end() &&
+                this->m_componentTypes.contains(std::type_index(std::type_index(typeid(T)))) &&
                 "component not registered registered"
             );
 
-            return this->m_componentTypes.at(tname);
+            return this->m_componentTypes.at(std::type_index(typeid(T)));
         }
 
-        const std::unordered_map<const char*, BaseComponentPool*>& GetComponentPools() const { return m_components; }
-        std::unordered_map<const char*, BaseComponentPool*>& GetComponentPools() { return m_components; }
+        const std::unordered_map<std::type_index, BaseComponentPool*>& GetComponentPools() const { return m_components; }
+        std::unordered_map<std::type_index, BaseComponentPool*>& GetComponentPools() { return m_components; }
 
         template <typename T>
         bool HasComponent(EntityID e) const { return this->GetComponentPool<T>().Has(e); }
@@ -66,40 +65,37 @@ namespace Ecs {
         void RemoveComponent(EntityID e) { this->GetComponentPool<T>().Remove(e); }
 
     private:
-        std::unordered_map<const char*, ComponentID> m_componentTypes;
-        std::unordered_map<const char*, BaseComponentPool*> m_components;
+        std::unordered_map<std::type_index, ComponentID> m_componentTypes;
+        std::unordered_map<std::type_index, BaseComponentPool*> m_components;
         ComponentID m_nextComponentType;
 
         template <typename T>
         const ComponentPool<T>* GetComponentPool() const {
-            auto tname = typeid(T).name();
             assert(
-                this->m_componentTypes.find(tname) != this->m_componentTypes.end() &&
+                this->m_componentTypes.contains(std::type_index(typeid(T))) &&
                 "component not registered registered"
             );
-            return static_cast<ComponentPool<T>*>(this->m_components.at(tname));
+            return static_cast<ComponentPool<T>*>(this->m_components.at(std::type_index(typeid(T))));
         }
 
         template <typename T>
         ComponentPool<T>* GetComponentPool() {
-            auto tname = typeid(T).name();
             assert(
-                this->m_componentTypes.find(tname) != this->m_componentTypes.end() &&
+                this->m_componentTypes.contains(std::type_index(typeid(T))) &&
                 "component not registered registered"
             );
-            return static_cast<ComponentPool<T>*>(this->m_components[tname]);
+            return static_cast<ComponentPool<T>*>(this->m_components[std::type_index(typeid(T))]);
         }
 
         template <typename ...Component>
         void RegisterComponents(ComponentGroup<Component ...>) {
             ([&]() {
-                auto tname = typeid(Component).name();
                 assert(
-                    this->m_componentTypes.find(tname) == this->m_componentTypes.end() && "component already registered"
+                    !this->m_componentTypes.contains(typeid(Component)) && "component already registered"
                 );
 
-                this->m_componentTypes[tname] = this->m_nextComponentType;
-                this->m_components[tname] = new ComponentPool<Component>{};
+                this->m_componentTypes[typeid(Component)] = this->m_nextComponentType;
+                this->m_components[typeid(Component)] = new ComponentPool<Component>{};
                 this->m_nextComponentType <<= 1;
             }(), ...);
         }

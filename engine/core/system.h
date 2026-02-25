@@ -62,8 +62,9 @@ namespace Ecs {
 
     class SystemsManager {
     public:
-        using iterator = std::unordered_map<const char*, BaseSystem*>::iterator;
-        using const_iterator = std::unordered_map<const char*, BaseSystem*>::const_iterator;
+        using systems = std::unordered_map<std::type_index, BaseSystem*>;
+        using iterator = systems::iterator;
+        using const_iterator = systems::const_iterator;
 
         SystemsManager();
         ~SystemsManager();
@@ -74,14 +75,12 @@ namespace Ecs {
         const_iterator end() const { return this->m_systems.end(); }
 
     private:
-        std::unordered_map<const char*, BaseSystem*> m_systems;
+        systems m_systems;
 
         template <typename ...System>
         void RegisterSystems(SystemGroup<System ...>) {
             ([&]() {
-                auto tname = typeid(System).name();
-
-                this->m_systems[tname] = reinterpret_cast<BaseSystem*>(new System{});
+                this->m_systems[std::type_index(typeid(System))] = reinterpret_cast<BaseSystem*>(new System{});
             }(), ...);
         }
     };
