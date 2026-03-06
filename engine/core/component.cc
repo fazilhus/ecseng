@@ -6,12 +6,23 @@
 
 
 namespace Ecs {
-    ComponentsManager::ComponentsManager()
-        : m_nextComponentType(1) {
-        RegisterComponents(AllComponents{});
 
-        for (const auto& [k, v]: this->m_componentTypes) { std::cout << k.name() << ' ' << std::to_string(v) << '\n'; }
+    CameraComponent::CameraComponent(const glm::mat4& v, const glm::mat4& p) {
+        this->view = v;
+        this->projection = p;
+        this->invView = glm::inverse(v);
+        this->invProjection = glm::inverse(p);
+        this->viewProjection = p * v;
+        this->invViewProjection = glm::inverse(this->viewProjection);
     }
 
-    ComponentsManager::~ComponentsManager() { for (auto& [k, v]: m_components) { delete v; } }
+    void ComponentsManager::init() {
+        m_nextComponentType = 1;
+        RegisterComponents(AllComponents{});
+    }
+
+    void ComponentsManager::deinit() {
+        for (auto& [k, v]: m_components) { delete v; }
+    }
+
 } // namespace Ecs

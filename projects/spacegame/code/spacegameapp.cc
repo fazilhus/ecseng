@@ -20,6 +20,7 @@
 #include "render/physics.h"
 #include <chrono>
 #include "spaceship.h"
+#include "gtx/quaternion.hpp"
 
 using namespace Display;
 using namespace Render;
@@ -94,44 +95,42 @@ namespace Game {
             Physics::LoadColliderMesh("assets/space/Asteroid_6_physics.glb")
         };
 
-        std::vector<std::tuple<ModelId, Physics::ColliderId, glm::mat4>> asteroids;
+        // std::vector<std::tuple<ModelId, Physics::ColliderId, glm::mat4>> asteroids;
 
         // Setup asteroids near
         for (int i = 0; i < 100; i++) {
-            std::tuple<ModelId, Physics::ColliderId, glm::mat4> asteroid;
-            size_t resourceIndex = (size_t)(Core::FastRandom() % 6);
-            std::get<0>(asteroid) = models[resourceIndex];
-            float span = 20.0f;
-            glm::vec3 translation = glm::vec3(
+            const auto resourceIndex = static_cast<size_t>(Core::FastRandom() % 6);
+            constexpr auto span = 30.0f;
+            const auto translation = glm::vec3(
                 Core::RandomFloatNTP() * span,
                 Core::RandomFloatNTP() * span,
                 Core::RandomFloatNTP() * span
             );
-            glm::vec3 rotationAxis = normalize(translation);
-            float rotation = translation.x;
-            glm::mat4 transform = glm::rotate(rotation, rotationAxis) * glm::translate(translation);
-            std::get<1>(asteroid) = Physics::CreateCollider(colliderMeshes[resourceIndex], transform);
-            std::get<2>(asteroid) = transform;
-            asteroids.push_back(asteroid);
+            const auto rotationAxis = glm::normalize(translation);
+            const auto rotation = glm::quat(Core::RandomFloatNTP(), rotationAxis);
+            const auto transform = glm::translate(translation) * glm::rotate(rotation.w, glm::axis(rotation)) * glm::scale(glm::vec3(1.0f));
+            const auto e = world->CreateEntity();
+            world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(e, models[resourceIndex]);
+            world->AddComponent<Ecs::PhysicsBodyComponent, Ecs::CT_PHYSICS>(e, Physics::CreateCollider(colliderMeshes[resourceIndex], transform));
+            world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(e, translation, rotation, glm::vec3(1.0f));
         }
 
         // Setup asteroids far
         for (int i = 0; i < 50; i++) {
-            std::tuple<ModelId, Physics::ColliderId, glm::mat4> asteroid;
-            size_t resourceIndex = (size_t)(Core::FastRandom() % 6);
-            std::get<0>(asteroid) = models[resourceIndex];
-            float span = 80.0f;
-            glm::vec3 translation = glm::vec3(
+            const auto resourceIndex = static_cast<size_t>(Core::FastRandom() % 6);
+            constexpr auto span = 100.0f;
+            const auto translation = glm::vec3(
                 Core::RandomFloatNTP() * span,
                 Core::RandomFloatNTP() * span,
                 Core::RandomFloatNTP() * span
             );
-            glm::vec3 rotationAxis = normalize(translation);
-            float rotation = translation.x;
-            glm::mat4 transform = glm::rotate(rotation, rotationAxis) * glm::translate(translation);
-            std::get<1>(asteroid) = Physics::CreateCollider(colliderMeshes[resourceIndex], transform);
-            std::get<2>(asteroid) = transform;
-            asteroids.push_back(asteroid);
+            const auto rotationAxis = glm::normalize(translation);
+            const auto rotation = glm::quat(Core::RandomFloatNTP(), rotationAxis);
+            const auto transform = glm::translate(translation) * glm::rotate(rotation.w, glm::axis(rotation)) * glm::scale(glm::vec3(1.0f));
+            const auto e = world->CreateEntity();
+            world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(e, models[resourceIndex]);
+            world->AddComponent<Ecs::PhysicsBodyComponent, Ecs::CT_PHYSICS>(e, Physics::CreateCollider(colliderMeshes[resourceIndex], transform));
+            world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(e, translation, rotation, glm::vec3(1.0f));
         }
 
         // Setup skybox
@@ -196,7 +195,7 @@ namespace Game {
             Debug::DrawDebugText("FOOBAR", glm::vec3(0), {1, 0, 0, 1});
 
             // Store all drawcalls in the render device
-            for (auto const& asteroid: asteroids) { RenderDevice::Draw(std::get<0>(asteroid), std::get<2>(asteroid)); }
+            // for (auto const& asteroid: asteroids) { RenderDevice::Draw(std::get<0>(asteroid), std::get<2>(asteroid)); }
 
             RenderDevice::Draw(ship.model, ship.transform);
             world->Draw();

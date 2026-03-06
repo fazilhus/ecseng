@@ -3,13 +3,14 @@
 
 
 namespace Ecs {
-    EntityManager::EntityManager() {
+
+    void EntityManager::init() {
         for (EntityID i = 0; i < MaxEntityCount; ++i) { m_freeEntities.push(i); }
 
         m_signatures.resize(MaxEntityCount);
     }
 
-    EntityManager::~EntityManager() {}
+    void EntityManager::deinit() {}
 
     EntityID EntityManager::CreateEntity() {
         if (this->m_freeEntities.empty()) { throw std::bad_alloc{}; }

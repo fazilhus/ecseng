@@ -9,12 +9,14 @@
 
 
 namespace Ecs {
-    struct BaseSystem {
-        BaseSystem()
-            : sig() {}
+    class World;
 
-        BaseSystem(Signature sig)
-            : sig(sig) {}
+    struct BaseSystem {
+        BaseSystem(World* w)
+            : sig(), world(w) {}
+
+        // BaseSystem(World* w, Signature sig)
+        //     : sig(sig), world(w) {}
 
         virtual ~BaseSystem() {}
 
@@ -23,19 +25,20 @@ namespace Ecs {
         virtual void Draw(const std::vector<EntityID>& entities) {}
 
         Signature sig;
+        World* world;
     };
 
     template <ComponentTypes ...T>
     struct BaseSystemInt : public BaseSystem {
-        BaseSystemInt()
-            : BaseSystem() { ([&] { sig |= T; }(), ...); }
+        BaseSystemInt(World* w)
+            : BaseSystem(w) { ([&] { sig |= T; }(), ...); }
 
         virtual ~BaseSystemInt() override {}
     };
 
-    struct RigidBodySystem : public BaseSystemInt<CT_TRANSFORM, CT_CAMERA> {
-        RigidBodySystem()
-            : BaseSystemInt() {}
+    struct RigidBodySystem final : public BaseSystemInt<CT_TRANSFORM, CT_CAMERA> {
+        RigidBodySystem(World* w)
+            : BaseSystemInt(w) {}
 
         virtual void Start(const std::vector<EntityID>& entities) override {
         }
@@ -44,15 +47,14 @@ namespace Ecs {
         }
     };
 
-    struct DrawableSystem : public BaseSystemInt<CT_TRANSFORM, CT_MODEL> {
-        DrawableSystem()
-            : BaseSystemInt() {}
+    struct DrawableSystem final : public BaseSystemInt<CT_TRANSFORM, CT_MODEL> {
+        DrawableSystem(World* w)
+            : BaseSystemInt(w) {}
 
         virtual void Start(const std::vector<EntityID>& entities) override {
         }
 
-        virtual void Draw(const std::vector<EntityID>& entities) override {
-        }
+        virtual void Draw(const std::vector<EntityID>& entities) override;
     };
 
     template <typename ...Systems>
@@ -66,8 +68,11 @@ namespace Ecs {
         using iterator = systems::iterator;
         using const_iterator = systems::const_iterator;
 
-        SystemsManager();
-        ~SystemsManager();
+        SystemsManager() = default;
+        ~SystemsManager() = default;
+
+        void init(World* w);
+        void deinit();
 
         iterator begin() { return this->m_systems.begin(); }
         iterator end() { return this->m_systems.end(); }
@@ -78,9 +83,9 @@ namespace Ecs {
         systems m_systems;
 
         template <typename ...System>
-        void RegisterSystems(SystemGroup<System ...>) {
+        void RegisterSystems(World* w, SystemGroup<System ...>) {
             ([&]() {
-                this->m_systems[std::type_index(typeid(System))] = reinterpret_cast<BaseSystem*>(new System{});
+                this->m_systems[std::type_index(typeid(System))] = reinterpret_cast<BaseSystem*>(new System(w));
             }(), ...);
         }
     };

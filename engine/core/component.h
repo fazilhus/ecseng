@@ -11,28 +11,63 @@
 
 
 namespace Ecs {
-    struct TransformComponent {};
 
-    struct CameraComponent {};
+    struct TransformComponent {
+        glm::vec3 pos;
+        glm::quat rot;
+        glm::vec3 scale;
+
+        TransformComponent(const glm::vec3& pos, const glm::quat& rot, const glm::vec3& scale)
+            : pos(pos), rot(rot), scale(scale) {}
+        TransformComponent(const TransformComponent&) = default;
+        TransformComponent(TransformComponent&&) = default;
+        TransformComponent& operator=(const TransformComponent&) = default;
+        TransformComponent& operator=(TransformComponent&&) = default;
+
+        [[nodiscard]] glm::mat4 get_transform() const {
+            return glm::translate(pos) *  glm::rotate(rot.w, glm::axis(rot)) * glm::scale(scale);
+        }
+
+        [[nodiscard]] glm::mat4 get_inv_transform() const {
+            return glm::inverse(get_transform());
+        }
+    };
+
+    struct CameraComponent {
+        glm::mat4 view{};
+        glm::mat4 projection{};
+        glm::mat4 invView{};
+        glm::mat4 invProjection{};
+        glm::mat4 viewProjection{};
+        glm::mat4 invViewProjection{};
+
+        CameraComponent(const glm::mat4& v, const glm::mat4& p);
+    };
 
     struct ModelComponent {
         Render::ModelId model_id;
+
+        ModelComponent(const Render::ModelId model_id) : model_id(model_id) {}
     };
 
-    struct PhysicsComponent {
-        Physics::ColliderMeshId mesh_id;
+    struct PhysicsBodyComponent {
         Physics::ColliderId collider_id;
+
+        PhysicsBodyComponent(const Physics::ColliderId cid) : collider_id(cid) {}
     };
 
     template <typename ...Components>
     struct ComponentGroup {};
 
-    using AllComponents = ComponentGroup<TransformComponent, CameraComponent, ModelComponent, PhysicsComponent>;
+    using AllComponents = ComponentGroup<TransformComponent, CameraComponent, ModelComponent, PhysicsBodyComponent>;
 
     class ComponentsManager {
     public:
-        ComponentsManager();
-        ~ComponentsManager();
+        ComponentsManager() = default;
+        ~ComponentsManager() = default;
+
+        void init();
+        void deinit();
 
         template <typename T>
         ComponentID GetComponentType() const {
@@ -48,13 +83,13 @@ namespace Ecs {
         std::unordered_map<std::type_index, BaseComponentPool*>& GetComponentPools() { return m_components; }
 
         template <typename T>
-        bool HasComponent(EntityID e) const { return this->GetComponentPool<T>().Has(e); }
+        bool HasComponent(EntityID e) const { return this->GetComponentPool<T>()->Has(e); }
 
         template <typename T>
-        const T& GetComponent(EntityID e) const { return this->GetComponentPool<T>().Get(e); }
+        const T& GetComponent(EntityID e) const { return this->GetComponentPool<T>()->Get(e); }
 
         template <typename T>
-        T& GetComponent(EntityID e) { return this->GetComponentPool<T>().Get(e); }
+        T& GetComponent(EntityID e) { return this->GetComponentPool<T>()->Get(e); }
 
         template <typename T, typename ...Args>
         void AddComponent(EntityID e, Args&& ...args) {
@@ -62,7 +97,7 @@ namespace Ecs {
         }
 
         template <typename T>
-        void RemoveComponent(EntityID e) { this->GetComponentPool<T>().Remove(e); }
+        void RemoveComponent(EntityID e) { this->GetComponentPool<T>()->Remove(e); }
 
     private:
         std::unordered_map<std::type_index, ComponentID> m_componentTypes;

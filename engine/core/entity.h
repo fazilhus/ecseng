@@ -8,8 +8,11 @@
 namespace Ecs {
     class EntityManager {
     public:
-        EntityManager();
-        ~EntityManager();
+        EntityManager() = default;
+        ~EntityManager() = default;
+
+        void init();
+        void deinit();
 
         EntityID CreateEntity();
         void DestroyEntity(EntityID id);
@@ -18,7 +21,7 @@ namespace Ecs {
         void SetSignature(EntityID id, Signature sig);
 
     private:
-        std::priority_queue<EntityID, std::vector<EntityID>, std::greater<EntityID>> m_freeEntities;
+        std::priority_queue<EntityID, std::vector<EntityID>, std::greater<>> m_freeEntities;
         std::vector<EntityID> m_entities;
         std::vector<Signature> m_signatures;
     };

@@ -4,16 +4,23 @@
 
 namespace Ecs {
     World::World() {
-        auto eid = CreateEntity();
-        AddComponent<TransformComponent, CT_TRANSFORM>(eid);
-        AddComponent<CameraComponent, CT_CAMERA>(eid);
-
-        eid = CreateEntity();
-        AddComponent<ModelComponent, CT_MODEL>(eid);
-        AddComponent<TransformComponent, CT_TRANSFORM>(eid);
+        m_entitiesManager.init();
+        m_componentsManager.init();
+        m_systemsManager.init(this);
+        // auto eid = CreateEntity();
+        // AddComponent<TransformComponent, CT_TRANSFORM>(eid);
+        // AddComponent<CameraComponent, CT_CAMERA>(eid);
+        //
+        // eid = CreateEntity();
+        // AddComponent<ModelComponent, CT_MODEL>(eid);
+        // AddComponent<TransformComponent, CT_TRANSFORM>(eid);
     }
 
-    World::~World() {}
+    World::~World() {
+        m_systemsManager.deinit();
+        m_componentsManager.deinit();
+        m_entitiesManager.deinit();
+    }
 
     std::vector<EntityID> World::GetAllEntitiesBySignature(Signature sig) {
         std::vector<EntityID> res;
