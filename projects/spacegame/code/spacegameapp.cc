@@ -95,7 +95,7 @@ namespace Game {
             Physics::LoadColliderMesh("assets/space/Asteroid_6_physics.glb")
         };
 
-        // std::vector<std::tuple<ModelId, Physics::ColliderId, glm::mat4>> asteroids;
+        std::vector<Ecs::EntityID> asteroids;
 
         // Setup asteroids near
         for (int i = 0; i < 100; i++) {
@@ -110,6 +110,7 @@ namespace Game {
             const auto rotation = glm::quat(Core::RandomFloatNTP(), rotationAxis);
             const auto transform = glm::translate(translation) * glm::rotate(rotation.w, glm::axis(rotation)) * glm::scale(glm::vec3(1.0f));
             const auto e = world->CreateEntity();
+            asteroids.push_back(e);
             world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(e, models[resourceIndex]);
             world->AddComponent<Ecs::PhysicsBodyComponent, Ecs::CT_PHYSICS>(e, Physics::CreateCollider(colliderMeshes[resourceIndex], transform));
             world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(e, translation, rotation, glm::vec3(1.0f));
@@ -128,6 +129,7 @@ namespace Game {
             const auto rotation = glm::quat(Core::RandomFloatNTP(), rotationAxis);
             const auto transform = glm::translate(translation) * glm::rotate(rotation.w, glm::axis(rotation)) * glm::scale(glm::vec3(1.0f));
             const auto e = world->CreateEntity();
+            asteroids.push_back(e);
             world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(e, models[resourceIndex]);
             world->AddComponent<Ecs::PhysicsBodyComponent, Ecs::CT_PHYSICS>(e, Physics::CreateCollider(colliderMeshes[resourceIndex], transform));
             world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(e, translation, rotation, glm::vec3(1.0f));
@@ -167,11 +169,17 @@ namespace Game {
             );
         }
 
-        SpaceShip ship;
-        ship.model = LoadModel("assets/space/spaceship.glb");
+        // SpaceShip ship;
+        // ship.model = LoadModel("assets/space/spaceship.glb");
+
+        auto ship = world->CreateEntity();
+        world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(ship, glm::vec3(0.0f), glm::quat(glm::mat4(1.0f)), glm::vec3(1.0f));
+        world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(ship, LoadModel("assets/space/spaceship.glb"));
+        world->AddComponent<Ecs::CameraComponent, Ecs::CT_CAMERA>(ship, glm::mat4(1.0f), glm::perspective(glm::radians(90.0f), float(w) / float(h), 0.01f, 1000.f));
+        world->AddComponent<Ecs::CharacterComponent, Ecs::CT_CHARACTER>(ship);
 
         std::clock_t c_start = std::clock();
-        double dt = 0.01667f;
+        auto dt = 0.01667f;
 
         world->Start();
 
@@ -187,9 +195,15 @@ namespace Game {
 
             if (kbd->pressed[Input::Key::Code::End]) { ShaderResource::ReloadShaders(); }
 
-            ship.Update(dt);
+            // ship.Update(dt);
+
+            for (auto e : asteroids) {
+                auto& transform_comp = world->GetComponent<Ecs::TransformComponent>(e);
+                transform_comp.rot.w += 0.05f * dt;
+            }
+
             world->Update(dt);
-            ship.CheckCollisions();
+            // ship.CheckCollisions();
 
             // Draw some debug text
             Debug::DrawDebugText("FOOBAR", glm::vec3(0), {1, 0, 0, 1});
@@ -197,7 +211,8 @@ namespace Game {
             // Store all drawcalls in the render device
             // for (auto const& asteroid: asteroids) { RenderDevice::Draw(std::get<0>(asteroid), std::get<2>(asteroid)); }
 
-            RenderDevice::Draw(ship.model, ship.transform);
+            // RenderDevice::Draw(ship.model, ship.transform);
+            world->BeforeDraw();
             world->Draw();
 
             // Execute the entire rendering pipeline
@@ -207,7 +222,7 @@ namespace Game {
             this->window->SwapBuffers();
 
             auto timeEnd = std::chrono::steady_clock::now();
-            dt = std::min(0.04, std::chrono::duration<double>(timeEnd - timeStart).count());
+            dt = std::min(0.04f, std::chrono::duration<float>(timeEnd - timeStart).count());
 
             if (kbd->pressed[Input::Key::Code::Escape])
                 this->Exit();

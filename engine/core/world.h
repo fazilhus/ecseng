@@ -50,8 +50,14 @@ namespace Ecs {
 
         std::vector<EntityID> GetAllEntitiesBySignature(Signature sig);
 
+        template <typename T>
+        EntityID GetEntityWithComponent() {
+
+        }
+
         void Start();
-        void Update(double dt);
+        void Update(float dt);
+        void BeforeDraw();
         void Draw();
 
     private:

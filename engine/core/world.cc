@@ -35,14 +35,26 @@ namespace Ecs {
     }
 
     void World::Start() {
-        for (auto& [name, sys]: this->m_systemsManager) { sys->Start(this->GetAllEntitiesBySignature(sys->sig)); }
+        for (auto& [name, sys]: this->m_systemsManager) {
+            sys->Start(this->GetAllEntitiesBySignature(sys->sig));
+        }
     }
 
-    void World::Update(double dt) {
-        for (auto& [name, sys]: this->m_systemsManager) { sys->Update(this->GetAllEntitiesBySignature(sys->sig), dt); }
+    void World::Update(float dt) {
+        for (auto& [name, sys]: this->m_systemsManager) {
+            sys->Update(this->GetAllEntitiesBySignature(sys->sig), dt);
+        }
+    }
+
+    void World::BeforeDraw() {
+        for (auto& [name, sys]: this->m_systemsManager) {
+            sys->BeforeDraw(this->GetAllEntitiesBySignature(sys->sig));
+        }
     }
 
     void World::Draw() {
-        for (auto& [name, sys]: this->m_systemsManager) { sys->Draw(this->GetAllEntitiesBySignature(sys->sig)); }
+        for (auto& [name, sys]: this->m_systemsManager) {
+            sys->Draw(this->GetAllEntitiesBySignature(sys->sig));
+        }
     }
 } // namespace Ecs

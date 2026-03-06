@@ -13,9 +13,9 @@
 namespace Ecs {
 
     struct TransformComponent {
-        glm::vec3 pos;
-        glm::quat rot;
-        glm::vec3 scale;
+        glm::vec3 pos{};
+        glm::quat rot{};
+        glm::vec3 scale{};
 
         TransformComponent(const glm::vec3& pos, const glm::quat& rot, const glm::vec3& scale)
             : pos(pos), rot(rot), scale(scale) {}
@@ -25,7 +25,7 @@ namespace Ecs {
         TransformComponent& operator=(TransformComponent&&) = default;
 
         [[nodiscard]] glm::mat4 get_transform() const {
-            return glm::translate(pos) *  glm::rotate(rot.w, glm::axis(rot)) * glm::scale(scale);
+            return glm::translate(pos) * glm::rotate(rot.w, glm::axis(rot)) * glm::scale(scale);
         }
 
         [[nodiscard]] glm::mat4 get_inv_transform() const {
@@ -36,30 +36,62 @@ namespace Ecs {
     struct CameraComponent {
         glm::mat4 view{};
         glm::mat4 projection{};
-        glm::mat4 invView{};
-        glm::mat4 invProjection{};
-        glm::mat4 viewProjection{};
-        glm::mat4 invViewProjection{};
+        glm::vec3 cam_pos{};
+        glm::vec3 cam_offset{};
+        float cam_smooth{};
 
         CameraComponent(const glm::mat4& v, const glm::mat4& p);
+        CameraComponent(const CameraComponent&) = default;
+        CameraComponent(CameraComponent&&) = default;
+        CameraComponent& operator=(const CameraComponent&) = default;
+        CameraComponent& operator=(CameraComponent&&) = default;
     };
 
     struct ModelComponent {
         Render::ModelId model_id;
 
         ModelComponent(const Render::ModelId model_id) : model_id(model_id) {}
+        ModelComponent(const ModelComponent&) = default;
+        ModelComponent(ModelComponent&&) = default;
+        ModelComponent& operator=(const ModelComponent&) = default;
+        ModelComponent& operator=(ModelComponent&&) = default;
     };
 
     struct PhysicsBodyComponent {
         Physics::ColliderId collider_id;
 
         PhysicsBodyComponent(const Physics::ColliderId cid) : collider_id(cid) {}
+        PhysicsBodyComponent(const PhysicsBodyComponent&) = default;
+        PhysicsBodyComponent(PhysicsBodyComponent&&) = default;
+        PhysicsBodyComponent& operator=(const PhysicsBodyComponent&) = default;
+        PhysicsBodyComponent& operator=(PhysicsBodyComponent&&) = default;
+    };
+
+    struct CharacterComponent {
+        glm::vec3 linearVelocity = glm::vec3(0);
+
+        float normalSpeed = 1.0f;
+        float boostSpeed = normalSpeed * 2.0f;
+        float accelerationFactor = 1.0f;
+
+        float currentSpeed = 0.0f;
+
+        float rotationZ = 0;
+        float rotXSmooth = 0;
+        float rotYSmooth = 0;
+        float rotZSmooth = 0;
+
+        CharacterComponent() {}
+        CharacterComponent(const CharacterComponent&) = default;
+        CharacterComponent(CharacterComponent&&) = default;
+        CharacterComponent& operator=(const CharacterComponent&) = default;
+        CharacterComponent& operator=(CharacterComponent&&) = default;
     };
 
     template <typename ...Components>
     struct ComponentGroup {};
 
-    using AllComponents = ComponentGroup<TransformComponent, CameraComponent, ModelComponent, PhysicsBodyComponent>;
+    using AllComponents = ComponentGroup<TransformComponent, CameraComponent, ModelComponent, PhysicsBodyComponent, CharacterComponent>;
 
     class ComponentsManager {
     public:

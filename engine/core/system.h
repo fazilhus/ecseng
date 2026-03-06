@@ -21,7 +21,8 @@ namespace Ecs {
         virtual ~BaseSystem() {}
 
         virtual void Start(const std::vector<EntityID>& entities) {}
-        virtual void Update(const std::vector<EntityID>& entities, double dt) {}
+        virtual void Update(const std::vector<EntityID>& entities, float dt) {}
+        virtual void BeforeDraw(const std::vector<EntityID>& entities) {}
         virtual void Draw(const std::vector<EntityID>& entities) {}
 
         Signature sig;
@@ -32,35 +33,32 @@ namespace Ecs {
     struct BaseSystemInt : public BaseSystem {
         BaseSystemInt(World* w)
             : BaseSystem(w) { ([&] { sig |= T; }(), ...); }
-
         virtual ~BaseSystemInt() override {}
     };
 
     struct RigidBodySystem final : public BaseSystemInt<CT_TRANSFORM, CT_CAMERA> {
         RigidBodySystem(World* w)
             : BaseSystemInt(w) {}
-
-        virtual void Start(const std::vector<EntityID>& entities) override {
-        }
-
-        virtual void Update(const std::vector<EntityID>& entities, double dt) override {
-        }
     };
 
     struct DrawableSystem final : public BaseSystemInt<CT_TRANSFORM, CT_MODEL> {
         DrawableSystem(World* w)
             : BaseSystemInt(w) {}
-
-        virtual void Start(const std::vector<EntityID>& entities) override {
-        }
-
         virtual void Draw(const std::vector<EntityID>& entities) override;
+    };
+
+    struct PlayableSystem final : public BaseSystemInt<CT_TRANSFORM, CT_CAMERA, CT_CHARACTER> {
+        PlayableSystem(World* w)
+            : BaseSystemInt(w) {}
+        virtual void Start(const std::vector<EntityID>& entities) override;
+        virtual void Update(const std::vector<EntityID>& entities, float dt) override;
+        virtual void BeforeDraw(const std::vector<EntityID>& entities) override;
     };
 
     template <typename ...Systems>
     struct SystemGroup {};
 
-    using AllSystems = SystemGroup<RigidBodySystem, DrawableSystem>;
+    using AllSystems = SystemGroup<RigidBodySystem, DrawableSystem, PlayableSystem>;
 
     class SystemsManager {
     public:
