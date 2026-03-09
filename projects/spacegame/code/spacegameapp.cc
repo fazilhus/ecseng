@@ -199,7 +199,11 @@ namespace Game {
 
             for (auto e : asteroids) {
                 auto& transform_comp = world->GetComponent<Ecs::TransformComponent>(e);
-                transform_comp.rot.w += 0.05f * dt;
+                const auto& axis = glm::axis(transform_comp.rot);
+                auto angle = glm::angle(transform_comp.rot);
+                angle += 0.05f * dt;
+                transform_comp.rot = glm::rotate(angle, axis);
+                transform_comp.transform = glm::translate(transform_comp.pos) * glm::mat4_cast(transform_comp.rot);
             }
 
             world->Update(dt);

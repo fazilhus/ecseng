@@ -11,7 +11,7 @@ namespace Ecs {
         for (const auto e : entities) {
             const auto& transform = world->GetComponent<TransformComponent>(e);
             const auto& model = world->GetComponent<ModelComponent>(e);
-            Render::RenderDevice::Draw(model.model_id, transform.get_transform());
+            Render::RenderDevice::Draw(model.model_id, transform.transform);
         }
     }
 
@@ -27,7 +27,7 @@ namespace Ecs {
         using namespace Render;
         const Keyboard* kbd = GetDefaultKeyboard();
 
-        Camera* cam = CameraManager::GetCamera(CAMERA_MAIN);
+        // Camera* cam = CameraManager::GetCamera(CAMERA_MAIN);
 
         auto& t_comp = world->GetComponent<TransformComponent>(entities[0]);
         auto& cam_comp = world->GetComponent<CameraComponent>(entities[0]);
@@ -41,7 +41,7 @@ namespace Ecs {
         }
         else { char_comp.currentSpeed = 0; }
         auto desiredVelocity = glm::vec3(0, 0, char_comp.currentSpeed);
-        desiredVelocity = t_comp.get_transform() * glm::vec4(desiredVelocity, 0.0f);
+        desiredVelocity = t_comp.transform * glm::vec4(desiredVelocity, 0.0f);
 
         char_comp.linearVelocity = glm::mix(char_comp.linearVelocity, desiredVelocity, dt * char_comp.accelerationFactor);
 
@@ -59,13 +59,13 @@ namespace Ecs {
         t_comp.rot *= localOrientation;
         char_comp.rotationZ -= char_comp.rotXSmooth;
         char_comp.rotationZ = glm::clamp(char_comp.rotationZ, -45.0f, 45.0f);
-        t_comp.rot *= glm::quat(glm::vec3(0, 0, char_comp.rotationZ));
+        t_comp.transform = glm::translate(t_comp.pos) * glm::mat4_cast(glm::quat(t_comp.rot)) * glm::mat4_cast(glm::quat(glm::vec3(0, 0, char_comp.rotationZ)));
         char_comp.rotationZ = glm::mix(char_comp.rotationZ, 0.0f, dt * cam_comp.cam_smooth);
 
         // update camera view transform
-        const glm::vec3 desiredCamPos = t_comp.pos + glm::vec3(t_comp.get_transform() * glm::vec4(cam_comp.cam_offset, 0));
+        const glm::vec3 desiredCamPos = t_comp.pos + glm::vec3(t_comp.transform * glm::vec4(cam_comp.cam_offset, 0));
         cam_comp.cam_pos = glm::mix(cam_comp.cam_pos, desiredCamPos, dt * cam_comp.cam_smooth);
-        cam->view = lookAt(cam_comp.cam_pos, cam_comp.cam_pos + glm::vec3(t_comp.get_transform()[2]), glm::vec3(t_comp.get_transform()[1]));
+        cam_comp.view = lookAt(cam_comp.cam_pos, cam_comp.cam_pos + glm::vec3(t_comp.transform[2]), glm::vec3(t_comp.transform[1]));
     }
 
     void PlayableSystem::BeforeDraw(const std::vector<EntityID>& entities) {

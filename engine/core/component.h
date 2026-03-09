@@ -13,24 +13,16 @@
 namespace Ecs {
 
     struct TransformComponent {
+        glm::mat4 transform = glm::mat4(1.0f);
         glm::vec3 pos{};
         glm::quat rot{};
         glm::vec3 scale{};
 
-        TransformComponent(const glm::vec3& pos, const glm::quat& rot, const glm::vec3& scale)
-            : pos(pos), rot(rot), scale(scale) {}
+        TransformComponent(const glm::vec3& pos, const glm::quat& rot, const glm::vec3& scale);
         TransformComponent(const TransformComponent&) = default;
         TransformComponent(TransformComponent&&) = default;
         TransformComponent& operator=(const TransformComponent&) = default;
         TransformComponent& operator=(TransformComponent&&) = default;
-
-        [[nodiscard]] glm::mat4 get_transform() const {
-            return glm::translate(pos) * glm::rotate(rot.w, glm::axis(rot)) * glm::scale(scale);
-        }
-
-        [[nodiscard]] glm::mat4 get_inv_transform() const {
-            return glm::inverse(get_transform());
-        }
     };
 
     struct CameraComponent {
