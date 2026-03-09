@@ -21,6 +21,7 @@ namespace Ecs {
         virtual ~BaseSystem() {}
 
         virtual void Start(const std::vector<EntityID>& entities) {}
+        virtual void PhysicsUpdate(const std::vector<EntityID>& entities, float dt) {}
         virtual void Update(const std::vector<EntityID>& entities, float dt) {}
         virtual void BeforeDraw(const std::vector<EntityID>& entities) {}
         virtual void Draw(const std::vector<EntityID>& entities) {}
@@ -33,12 +34,13 @@ namespace Ecs {
     struct BaseSystemInt : public BaseSystem {
         BaseSystemInt(World* w)
             : BaseSystem(w) { ([&] { sig |= T; }(), ...); }
-        virtual ~BaseSystemInt() override {}
+        virtual ~BaseSystemInt() override = default;
     };
 
-    struct RigidBodySystem final : public BaseSystemInt<CT_TRANSFORM, CT_CAMERA> {
-        RigidBodySystem(World* w)
+    struct PhysicsBodySystem final : public BaseSystemInt<CT_TRANSFORM, CT_COLLISION> {
+        PhysicsBodySystem(World* w)
             : BaseSystemInt(w) {}
+        virtual void PhysicsUpdate(const std::vector<EntityID>& entities, float dt) override;
     };
 
     struct DrawableSystem final : public BaseSystemInt<CT_TRANSFORM, CT_MODEL> {
@@ -58,7 +60,7 @@ namespace Ecs {
     template <typename ...Systems>
     struct SystemGroup {};
 
-    using AllSystems = SystemGroup<RigidBodySystem, DrawableSystem, PlayableSystem>;
+    using AllSystems = SystemGroup<PhysicsBodySystem, DrawableSystem, PlayableSystem>;
 
     class SystemsManager {
     public:

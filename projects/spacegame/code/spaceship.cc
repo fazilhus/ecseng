@@ -40,7 +40,6 @@ namespace Game {
     }
 
     void SpaceShip::Update(float dt) {
-        Mouse* mouse = Input::GetDefaultMouse();
         Keyboard* kbd = Input::GetDefaultKeyboard();
 
         Camera* cam = CameraManager::GetCamera(CAMERA_MAIN);
@@ -102,21 +101,21 @@ namespace Game {
     }
 
     bool SpaceShip::CheckCollisions() {
-        glm::mat4 rotation = (glm::mat4)orientation;
+        auto rotation = mat4_cast(orientation);
         bool hit = false;
-        for (int i = 0; i < sizeof(colliderEndPoints) / sizeof(glm::vec3); i++) {
-            glm::vec3 pos = position;
-            glm::vec3 dir = this->transform * glm::vec4(glm::normalize(colliderEndPoints[i]), 0.0f);
-            float len = glm::length(colliderEndPoints[i]);
+        for (int i = 0; i < sizeof(colliderEndPoints) / sizeof(vec3); i++) {
+            vec3 pos = position;
+            vec3 dir = this->transform * vec4(normalize(colliderEndPoints[i]), 0.0f);
+            float len = length(colliderEndPoints[i]);
             Physics::RaycastPayload payload = Physics::Raycast(position, dir, len);
 
             // debug draw collision rays
             Debug::DrawLine(
-                pos, pos + dir * len, 1.0f, glm::vec4(0, 1, 0, 1), glm::vec4(0, 1, 0, 1), Debug::RenderMode::AlwaysOnTop
+                pos, pos + dir * len, 1.0f, vec4(0, 1, 0, 1), vec4(0, 1, 0, 1), Debug::RenderMode::AlwaysOnTop
             );
 
             if (payload.hit) {
-                Debug::DrawDebugText("HIT", payload.hitPoint, glm::vec4(1, 1, 1, 1));
+                Debug::DrawDebugText("HIT", payload.hitPoint, vec4(1, 1, 1, 1));
                 hit = true;
             }
         }

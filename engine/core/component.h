@@ -49,14 +49,14 @@ namespace Ecs {
         ModelComponent& operator=(ModelComponent&&) = default;
     };
 
-    struct PhysicsBodyComponent {
+    struct ColliderComponent {
         Physics::ColliderId collider_id;
 
-        PhysicsBodyComponent(const Physics::ColliderId cid) : collider_id(cid) {}
-        PhysicsBodyComponent(const PhysicsBodyComponent&) = default;
-        PhysicsBodyComponent(PhysicsBodyComponent&&) = default;
-        PhysicsBodyComponent& operator=(const PhysicsBodyComponent&) = default;
-        PhysicsBodyComponent& operator=(PhysicsBodyComponent&&) = default;
+        ColliderComponent(const Physics::ColliderId cid) : collider_id(cid) {}
+        ColliderComponent(const ColliderComponent&) = default;
+        ColliderComponent(ColliderComponent&&) = default;
+        ColliderComponent& operator=(const ColliderComponent&) = default;
+        ColliderComponent& operator=(ColliderComponent&&) = default;
     };
 
     struct CharacterComponent {
@@ -80,10 +80,20 @@ namespace Ecs {
         CharacterComponent& operator=(CharacterComponent&&) = default;
     };
 
+    struct CollisionComponent {
+        std::vector<glm::vec3> rays;
+
+        CollisionComponent(const std::vector<glm::vec3>& v) : rays(v) {}
+        CollisionComponent(const CollisionComponent&) = default;
+        CollisionComponent(CollisionComponent&&) = default;
+        CollisionComponent& operator=(const CollisionComponent&) = default;
+        CollisionComponent& operator=(CollisionComponent&&) = default;
+    };
+
     template <typename ...Components>
     struct ComponentGroup {};
 
-    using AllComponents = ComponentGroup<TransformComponent, CameraComponent, ModelComponent, PhysicsBodyComponent, CharacterComponent>;
+    using AllComponents = ComponentGroup<TransformComponent, CameraComponent, ModelComponent, ColliderComponent, CharacterComponent, CollisionComponent>;
 
     class ComponentsManager {
     public:

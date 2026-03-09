@@ -112,7 +112,7 @@ namespace Game {
             const auto e = world->CreateEntity();
             asteroids.push_back(e);
             world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(e, models[resourceIndex]);
-            world->AddComponent<Ecs::PhysicsBodyComponent, Ecs::CT_PHYSICS>(e, Physics::CreateCollider(colliderMeshes[resourceIndex], transform));
+            world->AddComponent<Ecs::ColliderComponent, Ecs::CT_COLLIDER>(e, Physics::CreateCollider(colliderMeshes[resourceIndex], transform));
             world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(e, translation, rotation, glm::vec3(1.0f));
         }
 
@@ -131,7 +131,7 @@ namespace Game {
             const auto e = world->CreateEntity();
             asteroids.push_back(e);
             world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(e, models[resourceIndex]);
-            world->AddComponent<Ecs::PhysicsBodyComponent, Ecs::CT_PHYSICS>(e, Physics::CreateCollider(colliderMeshes[resourceIndex], transform));
+            world->AddComponent<Ecs::ColliderComponent, Ecs::CT_COLLIDER>(e, Physics::CreateCollider(colliderMeshes[resourceIndex], transform));
             world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(e, translation, rotation, glm::vec3(1.0f));
         }
 
@@ -177,6 +177,27 @@ namespace Game {
         world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(ship, LoadModel("assets/space/spaceship.glb"));
         world->AddComponent<Ecs::CameraComponent, Ecs::CT_CAMERA>(ship, glm::mat4(1.0f), glm::perspective(glm::radians(90.0f), float(w) / float(h), 0.01f, 1000.f));
         world->AddComponent<Ecs::CharacterComponent, Ecs::CT_CHARACTER>(ship);
+        world->AddComponent<Ecs::CollisionComponent, Ecs::CT_COLLISION>(ship, std::vector{
+            glm::vec3(1.40173, 0.0, -0.225342), // left wing back
+            glm::vec3(1.33578, 0.0, 0.088893), // left wing front
+            glm::vec3(0.227107, -0.200232, -0.588618), // left back engine bottom
+            glm::vec3(0.227107, 0.228809, -0.588618), // left back engine top
+            glm::vec3(0.391073, -0.130853, 1.28339), // left weapon
+            glm::vec3(0.134787, 0.0, 1.68965), // left front
+            glm::vec3(0.134787, 0.250728, 0.647422), // left wind shield
+
+            glm::vec3(-1.40173, 0.0, -0.225342), // right wing back
+            glm::vec3(-1.33578, 0.0, 0.088893), // right wing front
+            glm::vec3(-0.227107, -0.200232, -0.588618), // right back engine bottom
+            glm::vec3(-0.227107, 0.228809, -0.588618), // right back engine top
+            glm::vec3(-0.391073, -0.130853, 1.28339), // right weapon
+            glm::vec3(-0.134787, 0.0, 1.68965), // right front
+            glm::vec3(-0.134787, 0.250728, 0.647422), // right wind shield
+
+            glm::vec3(0.0, 0.525049, -0.392836), // top back
+            glm::vec3(0.0, 0.739624, 0.102582), // top fin
+            glm::vec3(0.0, -0.244758, 0.284825) // bottom
+        });
 
         std::clock_t c_start = std::clock();
         auto dt = 0.01667f;
@@ -206,16 +227,9 @@ namespace Game {
                 transform_comp.transform = glm::translate(transform_comp.pos) * glm::mat4_cast(transform_comp.rot);
             }
 
+            world->PhysicsUpdate(dt);
             world->Update(dt);
-            // ship.CheckCollisions();
 
-            // Draw some debug text
-            Debug::DrawDebugText("FOOBAR", glm::vec3(0), {1, 0, 0, 1});
-
-            // Store all drawcalls in the render device
-            // for (auto const& asteroid: asteroids) { RenderDevice::Draw(std::get<0>(asteroid), std::get<2>(asteroid)); }
-
-            // RenderDevice::Draw(ship.model, ship.transform);
             world->BeforeDraw();
             world->Draw();
 

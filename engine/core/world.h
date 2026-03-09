@@ -56,6 +56,7 @@ namespace Ecs {
         }
 
         void Start();
+        void PhysicsUpdate(float dt);
         void Update(float dt);
         void BeforeDraw();
         void Draw();

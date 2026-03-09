@@ -2,10 +2,34 @@
 #include "system.h"
 #include "world.h"
 #include "render/cameramanager.h"
+#include "render/debugrender.h"
 #include "render/input/inputserver.h"
 
 
 namespace Ecs {
+
+    void PhysicsBodySystem::PhysicsUpdate(const std::vector<EntityID>& entities, float dt) {
+        for (auto e : entities) {
+            const auto& t_comp = world->GetComponent<TransformComponent>(e);
+            const auto& c_comp = world->GetComponent<CollisionComponent>(e);
+            for (const auto& v : c_comp.rays) {
+                const auto dir = glm::vec3(t_comp.transform * glm::vec4(glm::normalize(v), 0.0f));
+                const auto len = glm::length(v);
+                Physics::RaycastPayload payload = Physics::Raycast(t_comp.pos, dir, len);
+
+#if _DEBUG
+                Debug::DrawLine(
+                    t_comp.pos, t_comp.pos + dir * len, 1.0f, glm::vec4(0, 1, 0, 1), glm::vec4(0, 1, 0, 1),
+                    Debug::RenderMode::AlwaysOnTop
+            );
+#endif
+
+                if (payload.hit) {
+                    Debug::DrawDebugText("HIT", payload.hitPoint, glm::vec4(1, 1, 1, 1));
+                }
+            }
+        }
+    }
 
     void DrawableSystem::Draw(const std::vector<EntityID>& entities) {
         for (const auto e : entities) {

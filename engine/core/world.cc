@@ -40,6 +40,12 @@ namespace Ecs {
         }
     }
 
+    void World::PhysicsUpdate(float dt) {
+        for (auto& [name, sys]: this->m_systemsManager) {
+            sys->PhysicsUpdate(this->GetAllEntitiesBySignature(sys->sig), dt);
+        }
+    }
+
     void World::Update(float dt) {
         for (auto& [name, sys]: this->m_systemsManager) {
             sys->Update(this->GetAllEntitiesBySignature(sys->sig), dt);
