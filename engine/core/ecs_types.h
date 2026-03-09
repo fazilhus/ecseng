@@ -18,6 +18,7 @@ namespace Ecs {
         CT_COLLIDER = 1 << 3,
         CT_CHARACTER = 1 << 4,
         CT_COLLISION = 1 << 5,
+        CT_WAYPOINT = 1 << 6,
         CT_MAX = 1 << 31,
     };
 

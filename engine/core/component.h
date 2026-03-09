@@ -90,10 +90,21 @@ namespace Ecs {
         CollisionComponent& operator=(CollisionComponent&&) = default;
     };
 
+    struct WaypointComponent {
+        EntityID prev{}, next{};
+
+        WaypointComponent() = default;
+        WaypointComponent(const WaypointComponent&) = default;
+        WaypointComponent(WaypointComponent&&) = default;
+        WaypointComponent& operator=(const WaypointComponent&) = default;
+        WaypointComponent& operator=(WaypointComponent&&) = default;
+    };
+
     template <typename ...Components>
     struct ComponentGroup {};
 
-    using AllComponents = ComponentGroup<TransformComponent, CameraComponent, ModelComponent, ColliderComponent, CharacterComponent, CollisionComponent>;
+    using AllComponents = ComponentGroup<TransformComponent, CameraComponent, ModelComponent, ColliderComponent,
+                                         CharacterComponent, CollisionComponent, WaypointComponent>;
 
     class ComponentsManager {
     public:
