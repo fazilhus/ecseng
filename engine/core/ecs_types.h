@@ -16,9 +16,10 @@ namespace Ecs {
         CT_CAMERA = 1 << 1,
         CT_MODEL = 1 << 2,
         CT_COLLIDER = 1 << 3,
-        CT_CHARACTER = 1 << 4,
-        CT_COLLISION = 1 << 5,
-        CT_WAYPOINT = 1 << 6,
+        CT_PLAYERCHARACTER = 1 << 4,
+        CT_AICHARACTER = 1 << 5,
+        CT_COLLISION = 1 << 6,
+        CT_WAYPOINT = 1 << 7,
         CT_MAX = 1 << 31,
     };
 

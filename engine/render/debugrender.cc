@@ -82,8 +82,7 @@ namespace Debug {
         const glm::vec3& position, const glm::quat& rotation, const float scale, const glm::vec4& color,
         const RenderMode renderModes, const float lineWidth
     ) {
-        glm::mat4 transform = glm::scale(glm::vec3(scale)) * (glm::mat4)rotation;
-        glm::translate(transform, position);
+        const glm::mat4 transform = glm::translate(position) * glm::mat4_cast(rotation) * glm::scale(glm::vec3(scale));
 
         BoxCommand* cmd = new BoxCommand();
         cmd->shape = DebugShape::BOX;
@@ -98,8 +97,7 @@ namespace Debug {
         const glm::vec3& position, const glm::quat& rotation, const float width, const float height, const float length,
         const glm::vec4& color, const RenderMode renderModes, const float lineWidth
     ) {
-        glm::mat4 transform = glm::scale(glm::vec3(width, height, length)) * (glm::mat4)rotation;
-        glm::translate(transform, position);
+        const glm::mat4 transform = glm::translate(position) * glm::mat4_cast(rotation) * glm::scale(glm::vec3(width, height, length));
 
         BoxCommand* cmd = new BoxCommand();
         cmd->shape = DebugShape::BOX;

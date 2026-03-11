@@ -135,6 +135,26 @@ namespace Game {
         //     world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(e, translation, rotation, glm::vec3(1.0f));
         // }
 
+        std::vector<Ecs::EntityID> waypoints;
+        for (auto i = 0; i < 4; ++i ) {
+            const auto e = world->CreateEntity();
+            waypoints.push_back(e);
+        }
+        {
+            const auto zero_rot = glm::quat_cast(glm::identity<glm::mat4>());
+            world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(waypoints[0], glm::vec3(-10.0f, 0.0f, -10.0f), zero_rot, glm::vec3(1.0f));
+            world->AddComponent<Ecs::WaypointComponent, Ecs::CT_WAYPOINT>(waypoints[0], waypoints[3], waypoints[1]);
+
+            world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(waypoints[1], glm::vec3(10.0f, 0.0f, -10.0f), zero_rot, glm::vec3(1.0f));
+            world->AddComponent<Ecs::WaypointComponent, Ecs::CT_WAYPOINT>(waypoints[1], waypoints[0], waypoints[2]);
+
+            world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(waypoints[2], glm::vec3(10.0f, 0.0f, 10.0f), zero_rot, glm::vec3(1.0f));
+            world->AddComponent<Ecs::WaypointComponent, Ecs::CT_WAYPOINT>(waypoints[2], waypoints[1], waypoints[3]);
+
+            world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(waypoints[3], glm::vec3(-10.0f, 0.0f, 10.0f), zero_rot, glm::vec3(1.0f));
+            world->AddComponent<Ecs::WaypointComponent, Ecs::CT_WAYPOINT>(waypoints[3], waypoints[2], waypoints[0]);
+        }
+
         // Setup skybox
         std::vector<const char*> skybox
         {
@@ -170,14 +190,14 @@ namespace Game {
         }
 
         // SpaceShip ship;
-        // ship.model = LoadModel("assets/space/spaceship.glb");
+        const auto ship_model = LoadModel("assets/space/spaceship.glb");
 
         auto ship = world->CreateEntity();
         {
-            world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(ship, glm::vec3(0.0f), glm::quat(glm::mat4(1.0f)), glm::vec3(1.0f));
-            world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(ship, LoadModel("assets/space/spaceship.glb"));
+            world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(ship, glm::vec3(0.0f, 0.0f, -25.0f), glm::quat(glm::mat4(1.0f)), glm::vec3(1.0f));
+            world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(ship, ship_model);
             world->AddComponent<Ecs::CameraComponent, Ecs::CT_CAMERA>(ship, glm::mat4(1.0f), glm::perspective(glm::radians(90.0f), float(w) / float(h), 0.01f, 1000.f));
-            world->AddComponent<Ecs::CharacterComponent, Ecs::CT_CHARACTER>(ship);
+            world->AddComponent<Ecs::PlayerCharacterComponent, Ecs::CT_PLAYERCHARACTER>(ship);
             world->AddComponent<Ecs::CollisionComponent, Ecs::CT_COLLISION>(ship, std::vector{
                 glm::vec3(1.40173, 0.0, -0.225342), // left wing back
                 glm::vec3(1.33578, 0.0, 0.088893), // left wing front
@@ -199,6 +219,13 @@ namespace Game {
                 glm::vec3(0.0, 0.739624, 0.102582), // top fin
                 glm::vec3(0.0, -0.244758, 0.284825) // bottom
             });
+        }
+
+        auto ai_ship = world->CreateEntity();
+        {
+            world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(ai_ship, glm::vec3(0.0f, 0.0f, 0.0f), glm::quat(glm::mat4(1.0f)), glm::vec3(1.0f));
+            world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(ai_ship, ship_model);
+            world->AddComponent<Ecs::AICharacterComponent, Ecs::CT_AICHARACTER>(ai_ship);
         }
 
         std::clock_t c_start = std::clock();
@@ -234,6 +261,11 @@ namespace Game {
 
             world->BeforeDraw();
             world->Draw();
+
+            for (auto i = 0; i < 4; ++i) {
+                const auto& tc = world->GetComponent<Ecs::TransformComponent>(waypoints[i]);
+                Debug::DrawBox(tc.pos, tc.rot, 0.25f, glm::vec4(1.0f - 0.33f * i, 0.0f, 0.0f + 0.33f * i, 1.0f));
+            }
 
             // Execute the entire rendering pipeline
             RenderDevice::Render(this->window, dt);

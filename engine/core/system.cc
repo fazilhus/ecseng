@@ -39,14 +39,14 @@ namespace Ecs {
         }
     }
 
-    void PlayableSystem::Start(const std::vector<EntityID>& entities) {
+    void PlayerControllerSystem::Start(const std::vector<EntityID>& entities) {
         auto& cam_comp = world->GetComponent<CameraComponent>(entities[0]);
         cam_comp.cam_pos = glm::vec3(0, 1.0f, -2.0f);
         cam_comp.cam_offset = glm::vec3(0.0f, 1.0f, -4.0f);
         cam_comp.cam_smooth = 10.0f;
     }
 
-    void PlayableSystem::Update(const std::vector<EntityID>& entities, float dt) {
+    void PlayerControllerSystem::Update(const std::vector<EntityID>& entities, float dt) {
         using namespace Input;
         using namespace Render;
         const Keyboard* kbd = GetDefaultKeyboard();
@@ -55,7 +55,7 @@ namespace Ecs {
 
         auto& t_comp = world->GetComponent<TransformComponent>(entities[0]);
         auto& cam_comp = world->GetComponent<CameraComponent>(entities[0]);
-        auto& char_comp = world->GetComponent<CharacterComponent>(entities[0]);
+        auto& char_comp = world->GetComponent<PlayerCharacterComponent>(entities[0]);
 
         if (kbd->held[Key::W]) {
             if (kbd->held[Key::Shift])
@@ -92,7 +92,7 @@ namespace Ecs {
         cam_comp.view = lookAt(cam_comp.cam_pos, cam_comp.cam_pos + glm::vec3(t_comp.transform[2]), glm::vec3(t_comp.transform[1]));
     }
 
-    void PlayableSystem::BeforeDraw(const std::vector<EntityID>& entities) {
+    void PlayerControllerSystem::BeforeDraw(const std::vector<EntityID>& entities) {
         using namespace Render;
         using namespace glm;
         const auto& cam_comp = world->GetComponent<CameraComponent>(entities[0]);
@@ -104,6 +104,28 @@ namespace Ecs {
         main_cam->viewProjection = cam_comp.projection * cam_comp.view;
         main_cam->invViewProjection = inverse(main_cam->viewProjection);
     }
+
+
+    void AIControllerSystem::Update(const std::vector<EntityID>& entities, float dt) {
+        for (const auto e : entities) {
+            auto& t_comp = world->GetComponent<TransformComponent>(e);
+            auto& ch_comp = world->GetComponent<AICharacterComponent>(e);
+
+            auto wt_pos = world->GetComponent<TransformComponent>(ch_comp.heading).pos;
+            auto dir = wt_pos - t_comp.pos;
+            if (glm::length(dir) < 0.5f) {
+                ch_comp.heading = world->GetComponent<WaypointComponent>(ch_comp.heading).next;
+                wt_pos = world->GetComponent<TransformComponent>(ch_comp.heading).pos;
+                dir = wt_pos - t_comp.pos;
+            }
+
+            dir = glm::normalize(dir);
+            ch_comp.linearVelocity = dir * ch_comp.normalSpeed;
+            t_comp.pos += ch_comp.linearVelocity * 10.0f * dt;
+            t_comp.transform = glm::translate(t_comp.pos) * glm::mat4_cast(t_comp.rot) * glm::scale(t_comp.scale);
+        }
+    }
+
 
     void SystemsManager::init(World* w) {
         RegisterSystems(w, AllSystems{});

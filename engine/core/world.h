@@ -49,10 +49,11 @@ namespace Ecs {
         bool RemoveComponent(EntityID id) { return m_componentsManager.RemoveComponent<T>(id); }
 
         std::vector<EntityID> GetAllEntitiesBySignature(Signature sig);
-
-        template <typename T>
-        EntityID GetEntityWithComponent() {
-
+        template <ComponentID ...Comps>
+        std::vector<EntityID> GetAllEntitiesByComponentIDs() {
+            Signature sig;
+            ([&] { sig |= Comps; }(), ...);
+            return GetAllEntitiesBySignature(sig);
         }
 
         void Start();

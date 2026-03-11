@@ -59,7 +59,8 @@ namespace Ecs {
         ColliderComponent& operator=(ColliderComponent&&) = default;
     };
 
-    struct CharacterComponent {
+    struct PlayerCharacterComponent {
+        EntityID heading{};
         glm::vec3 linearVelocity = glm::vec3(0);
 
         float normalSpeed = 1.0f;
@@ -73,11 +74,24 @@ namespace Ecs {
         float rotYSmooth = 0;
         float rotZSmooth = 0;
 
-        CharacterComponent() {}
-        CharacterComponent(const CharacterComponent&) = default;
-        CharacterComponent(CharacterComponent&&) = default;
-        CharacterComponent& operator=(const CharacterComponent&) = default;
-        CharacterComponent& operator=(CharacterComponent&&) = default;
+        PlayerCharacterComponent() {}
+        PlayerCharacterComponent(const PlayerCharacterComponent&) = default;
+        PlayerCharacterComponent(PlayerCharacterComponent&&) = default;
+        PlayerCharacterComponent& operator=(const PlayerCharacterComponent&) = default;
+        PlayerCharacterComponent& operator=(PlayerCharacterComponent&&) = default;
+    };
+
+    struct AICharacterComponent {
+        EntityID heading{};
+        glm::vec3 linearVelocity = glm::vec3(0);
+
+        float normalSpeed = 1.0f;
+
+        AICharacterComponent() {}
+        AICharacterComponent(const AICharacterComponent&) = default;
+        AICharacterComponent(AICharacterComponent&&) = default;
+        AICharacterComponent& operator=(const AICharacterComponent&) = default;
+        AICharacterComponent& operator=(AICharacterComponent&&) = default;
     };
 
     struct CollisionComponent {
@@ -93,7 +107,7 @@ namespace Ecs {
     struct WaypointComponent {
         EntityID prev{}, next{};
 
-        WaypointComponent() = default;
+        WaypointComponent(const EntityID p, const EntityID n) : prev(p), next(n) {}
         WaypointComponent(const WaypointComponent&) = default;
         WaypointComponent(WaypointComponent&&) = default;
         WaypointComponent& operator=(const WaypointComponent&) = default;
@@ -104,7 +118,7 @@ namespace Ecs {
     struct ComponentGroup {};
 
     using AllComponents = ComponentGroup<TransformComponent, CameraComponent, ModelComponent, ColliderComponent,
-                                         CharacterComponent, CollisionComponent, WaypointComponent>;
+                                         PlayerCharacterComponent, AICharacterComponent, CollisionComponent, WaypointComponent>;
 
     class ComponentsManager {
     public:
