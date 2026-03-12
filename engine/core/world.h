@@ -51,8 +51,10 @@ namespace Ecs {
         std::vector<EntityID> GetAllEntitiesBySignature(Signature sig);
         template <ComponentID ...Comps>
         std::vector<EntityID> GetAllEntitiesByComponentIDs() {
-            Signature sig;
-            ([&] { sig |= Comps; }(), ...);
+            Signature sig{};
+            ([&] {
+                sig |= Comps;
+            }(), ...);
             return GetAllEntitiesBySignature(sig);
         }
 

@@ -7,18 +7,21 @@
 
 #include <gtx/vector_angle.hpp>
 
+#include "random.h"
+
+
 namespace Ecs {
 
     void PhysicsBodySystem::PhysicsUpdate(const std::vector<EntityID>& entities, float dt) {
         for (auto e : entities) {
-            const auto& t_comp = world->GetComponent<TransformComponent>(e);
+            auto& t_comp = world->GetComponent<TransformComponent>(e);
             const auto& c_comp = world->GetComponent<CollisionComponent>(e);
             for (const auto& v : c_comp.rays) {
                 const auto dir = glm::vec3(t_comp.transform * glm::vec4(glm::normalize(v), 0.0f));
                 const auto len = glm::length(v);
                 Physics::RaycastPayload payload = Physics::Raycast(t_comp.pos, dir, len);
-
-#if _DEBUG
+#if 0
+// #if _DEBUG
                 Debug::DrawLine(
                     t_comp.pos, t_comp.pos + dir * len, 1.0f, glm::vec4(0, 1, 0, 1), glm::vec4(0, 1, 0, 1),
                     Debug::RenderMode::AlwaysOnTop
@@ -26,6 +29,11 @@ namespace Ecs {
 #endif
 
                 if (payload.hit) {
+                    const auto waypoints = world->GetAllEntitiesByComponentIDs<CT_TRANSFORM, CT_WAYPOINT>();
+                    const auto wp_t_comp = world->GetComponent<TransformComponent>(waypoints[Core::FastRandom() % waypoints.size()]);
+                    t_comp.pos = wp_t_comp.pos;
+                    t_comp.rot = glm::identity<glm::quat>();
+                    t_comp.transform = glm::translate(t_comp.pos) * glm::mat4_cast(t_comp.rot) * glm::scale(t_comp.scale);
                     Debug::DrawDebugText("HIT", payload.hitPoint, glm::vec4(1, 1, 1, 1));
                 }
             }
@@ -122,7 +130,7 @@ namespace Ecs {
 
             auto wt_pos = world->GetComponent<TransformComponent>(ch_comp.heading).pos;
             auto dir = wt_pos - t_comp.pos;
-            if (glm::length(dir) < 1.5f) {
+            if (glm::length(dir) < 2.5f) {
                 ch_comp.heading = world->GetComponent<WaypointComponent>(ch_comp.heading).next;
                 wt_pos = world->GetComponent<TransformComponent>(ch_comp.heading).pos;
                 dir = wt_pos - t_comp.pos;
