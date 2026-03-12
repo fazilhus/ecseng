@@ -124,10 +124,10 @@ namespace Ecs {
     };
 
     struct ParticleEmitterComponent {
-        glm::vec3 offset{};
+        float offset{};
         Render::ParticleEmitter emitter{};
 
-        ParticleEmitterComponent(const glm::vec3& o, const glm::vec4& color);
+        ParticleEmitterComponent(float zo, const glm::vec4& color);
         ParticleEmitterComponent(const ParticleEmitterComponent&) = default;
         ParticleEmitterComponent(ParticleEmitterComponent&&) = default;
         ParticleEmitterComponent& operator=(const ParticleEmitterComponent&) = default;

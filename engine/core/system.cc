@@ -42,7 +42,6 @@ namespace Ecs {
                     t_comp.pos = wp_t_comp.pos;
                     t_comp.rot = glm::identity<glm::quat>();
                     t_comp.transform = glm::translate(t_comp.pos) * glm::mat4_cast(t_comp.rot) * glm::scale(t_comp.scale);
-
                 }
             }
         }
@@ -162,13 +161,10 @@ namespace Ecs {
             auto& pe_comp = world->GetComponent<ParticleEmitterComponent>(e);
             const auto& mov_comp = world->GetComponent<MovementComponent>(e);
 
-            pe_comp.emitter.data.origin = glm::vec4(
-                glm::vec3(t_comp.pos + glm::vec3(t_comp.transform[0])) + (glm::vec3(t_comp.transform[2]) *
-                    pe_comp.offset), 1
-            );
+            pe_comp.emitter.data.origin = glm::vec4(t_comp.pos + glm::vec3(t_comp.transform[2]) * pe_comp.offset, 1);
             pe_comp.emitter.data.dir = glm::vec4(glm::vec3(-t_comp.transform[2]), 0);
 
-            float t = (mov_comp.currentSpeed / mov_comp.normalSpeed);
+            const auto t = mov_comp.currentSpeed / mov_comp.normalSpeed;
             pe_comp.emitter.data.startSpeed = 1.2f + (3.0f * t);
             pe_comp.emitter.data.endSpeed = 0.0f + (3.0f * t);
         }
