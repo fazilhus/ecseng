@@ -86,8 +86,15 @@ namespace Ecs {
         glm::vec3 linearVelocity = glm::vec3(0);
 
         float normalSpeed = 1.0f;
+        float currentSpeed = 0.0f;
+        float accelerationFactor = 1.0f;
 
-        AICharacterComponent() {}
+        float rotationZ = 0;
+        float rotXSmooth = 0;
+        float rotYSmooth = 0;
+        float rotZSmooth = 0;
+
+        AICharacterComponent(const EntityID h) : heading(h) {}
         AICharacterComponent(const AICharacterComponent&) = default;
         AICharacterComponent(AICharacterComponent&&) = default;
         AICharacterComponent& operator=(const AICharacterComponent&) = default;
