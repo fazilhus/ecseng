@@ -64,6 +64,16 @@ namespace Ecs {
         cam_comp.cam_smooth = 10.0f;
     }
 
+    glm::quat look_at(const glm::vec3& dir, const glm::vec3& up) {
+        glm::mat3 res{};
+
+        res[2] = dir;
+        res[0] = normalize(cross(up, res[2]));
+        res[1] = cross(res[2], res[0]);
+
+        return glm::quat_cast(res);
+    }
+
     void PlayerControllerSystem::Update(const std::vector<EntityID>& entities, float dt) {
         using namespace Input;
         using namespace Render;
@@ -76,11 +86,11 @@ namespace Ecs {
 
         if (kbd->pressed[Key::Space]) {
             const auto p = world->CreateEntity();
-            const auto translation = t_comp.pos + glm::vec3(t_comp.transform * glm::vec4(ps_comp.offset, 1.0f));
+            const auto translation = glm::vec3(t_comp.transform * glm::vec4(ps_comp.offset, 1.0f));
             world->AddComponent<TransformComponent, CT_TRANSFORM>(
                 p,
                 translation,
-                glm::identity<glm::quat>(),
+                look_at(),
                 glm::vec3(1.0f)
                 );
             world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(p, ps_comp.mesh);
@@ -139,15 +149,7 @@ namespace Ecs {
         main_cam->invViewProjection = inverse(main_cam->viewProjection);
     }
 
-    glm::quat look_at(const glm::vec3& dir, const glm::vec3& up) {
-        glm::mat3 res{};
 
-        res[2] = dir;
-        res[0] = normalize(cross(up, res[2]));
-        res[1] = cross(res[2], res[0]);
-
-        return glm::quat_cast(res);
-    }
 
     void AIControllerSystem::Update(const std::vector<EntityID>& entities, float dt) {
         for (const auto e : entities) {
@@ -239,7 +241,7 @@ namespace Ecs {
             t_comp.transform = glm::translate(t_comp.pos) * glm::mat4_cast(t_comp.rot) * glm::scale(t_comp.scale);
             Physics::SetTransform(c_comp.collider_id, t_comp.transform);
 
-            if (glm::length(t_comp.pos) > 5.0f) {
+            if (glm::length(t_comp.pos) > 50.0f) {
                 world->DestroyEntity(e);
             }
         }

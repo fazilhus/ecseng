@@ -225,7 +225,7 @@ namespace Game {
             world->AddComponent<Ecs::PlayerCharacterComponent, Ecs::CT_PLAYER_CHARACTER>(ship);
             world->AddComponent<Ecs::CollisionComponent, Ecs::CT_COLLISION>(ship, ship_collider);
             world->AddComponent<Ecs::ParticleEmitterComponent, Ecs::CT_PARTICLE_EMITTER>(ship, glm::vec3(0.0f, 0.0f, -0.5f), glm::vec4(0.38f, 0.76f, 0.95f, 1.0f));
-            world->AddComponent<Ecs::ProjectileSpawnerComponent, Ecs::CT_PROJECTILE_SPAWNER>(ship, glm::vec3(0.0f, 0.0f, 1.0f), 2.0f, laser_proj_model, laser_proj_cmesh);
+            world->AddComponent<Ecs::ProjectileSpawnerComponent, Ecs::CT_PROJECTILE_SPAWNER>(ship, glm::vec3(0.0f, 0.0f, 2.0f), 2.0f, laser_proj_model, laser_proj_cmesh);
         }
 
         std::vector<Ecs::EntityID> ai_ships;
@@ -242,7 +242,7 @@ namespace Game {
             world->AddComponent<Ecs::MovementComponent, Ecs::CT_MOVEMENT>(ai_ship);
             world->AddComponent<Ecs::AICharacterComponent, Ecs::CT_AI_CHARACTER>(ai_ship, waypoints.front(), static_cast<BehaviourType>(i));
             world->AddComponent<Ecs::CollisionComponent, Ecs::CT_COLLISION>(ai_ship, ship_collider);
-            world->AddComponent<Ecs::ProjectileSpawnerComponent, Ecs::CT_PROJECTILE_SPAWNER>(ai_ship, glm::vec3(0.0f, 0.0f, 1.0f), 2.0f, laser_proj_model, laser_proj_cmesh);
+            world->AddComponent<Ecs::ProjectileSpawnerComponent, Ecs::CT_PROJECTILE_SPAWNER>(ai_ship, glm::vec3(0.0f, 0.0f, 1.0f), 10.0f, laser_proj_model, laser_proj_cmesh);
         }
         world->AddComponent<Ecs::ParticleEmitterComponent, Ecs::CT_PARTICLE_EMITTER>(ai_ships[0], glm::vec3(0.0f, 0.0f, -0.5f), glm::vec4(0.1f, 0.7f, 0.1f, 1.0f));
         world->AddComponent<Ecs::ParticleEmitterComponent, Ecs::CT_PARTICLE_EMITTER>(ai_ships[1], glm::vec3(0.0f, 0.0f, -0.5f), glm::vec4(0.7f, 0.1f, 0.1f, 1.0f));
