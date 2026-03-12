@@ -37,6 +37,10 @@ namespace Ecs {
                         const auto& wp_wp_cp = world->GetComponent<WaypointComponent>(wp);
                         ai_comp.heading = wp_wp_cp.next;
                     }
+                    if (world->HasComponent<MovementComponent>(e)) {
+                        auto& mov_comp = world->GetComponent<MovementComponent>(e);
+                        mov_comp.linearVelocity = glm::vec3(0.0f);
+                    }
                     t_comp.pos = wp_t_comp.pos;
                     t_comp.rot = glm::identity<glm::quat>();
                     t_comp.transform = glm::translate(t_comp.pos) * glm::mat4_cast(t_comp.rot) * glm::scale(t_comp.scale);
@@ -67,8 +71,26 @@ namespace Ecs {
 
         auto& t_comp = world->GetComponent<TransformComponent>(entities[0]);
         auto& cam_comp = world->GetComponent<CameraComponent>(entities[0]);
-        const auto& char_comp = world->GetComponent<PlayerCharacterComponent>(entities[0]);
         auto& mov_comp = world->GetComponent<MovementComponent>(entities[0]);
+        const auto& ps_comp = world->GetComponent<ProjectileSpawnerComponent>(entities[0]);
+
+        if (kbd->pressed[Key::Space]) {
+            const auto p = world->CreateEntity();
+            const auto translation = t_comp.pos + glm::vec3(t_comp.transform * glm::vec4(ps_comp.offset, 1.0f));
+            world->AddComponent<TransformComponent, CT_TRANSFORM>(
+                p,
+                translation,
+                t_comp.rot,
+                glm::vec3(1.0f)
+                );
+            world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(p, ps_comp.mesh);
+            world->AddComponent<Ecs::ColliderComponent, Ecs::CT_COLLIDER>(p, Physics::CreateCollider(ps_comp.cmesh, glm::translate(translation) * glm::mat4_cast(t_comp.rot)));
+            world->AddComponent<Ecs::ProjectileComponent, CT_PROJECTILE>(
+                p,
+                t_comp.transform * glm::vec4(0, 0, 1.0f, 0.0f),
+                ps_comp.speed
+                );
+        }
 
         if (kbd->held[Key::W]) {
             if (kbd->held[Key::Shift])
@@ -204,6 +226,20 @@ namespace Ecs {
             const auto t = mov_comp.currentSpeed / mov_comp.normalSpeed;
             pe_comp.emitter.data.startSpeed = 1.2f + (3.0f * t);
             pe_comp.emitter.data.endSpeed = 0.0f + (3.0f * t);
+        }
+    }
+
+    void ProjectileSystem::Update(const std::vector<EntityID>& entities, float dt) {
+        for (auto e : entities) {
+            auto& t_comp = world->GetComponent<TransformComponent>(e);
+            const auto& p_comp = world->GetComponent<ProjectileComponent>(e);
+
+            t_comp.pos += p_comp.dir * p_comp.speed * dt;
+            t_comp.transform = glm::translate(t_comp.pos) * glm::mat4_cast(t_comp.rot) * glm::scale(t_comp.scale);
+
+            if (glm::length(t_comp.pos) > 20.0f) {
+                world->DestroyEntity(e);
+            }
         }
     }
 

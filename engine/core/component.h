@@ -127,23 +127,50 @@ namespace Ecs {
     };
 
     struct ParticleEmitterComponent {
-        float offset{};
+        glm::vec3 offset{};
         Render::ParticleEmitter emitter{};
 
-        ParticleEmitterComponent(float zo, const glm::vec4& color);
+        ParticleEmitterComponent(const glm::vec3& o, const glm::vec4& color);
         ParticleEmitterComponent(const ParticleEmitterComponent&) = default;
         ParticleEmitterComponent(ParticleEmitterComponent&&) = default;
         ParticleEmitterComponent& operator=(const ParticleEmitterComponent&) = default;
         ParticleEmitterComponent& operator=(ParticleEmitterComponent&&) = default;
     };
 
+    struct ProjectileSpawnerComponent {
+        glm::vec3 offset;
+        float speed;
+        Render::ModelId mesh;
+        Physics::ColliderMeshId cmesh;
+
+        ProjectileSpawnerComponent(
+            const glm::vec3& o, const float s, const Render::ModelId m, const Physics::ColliderMeshId cm
+            )
+            : offset(o), speed(s), mesh(m), cmesh(cm) {}
+        ProjectileSpawnerComponent(const ProjectileSpawnerComponent&) = default;
+        ProjectileSpawnerComponent(ProjectileSpawnerComponent&&) = default;
+        ProjectileSpawnerComponent& operator=(const ProjectileSpawnerComponent&) = default;
+        ProjectileSpawnerComponent& operator=(ProjectileSpawnerComponent&&) = default;
+    };
+
+    struct ProjectileComponent {
+        glm::vec3 dir;
+        float speed;
+
+        ProjectileComponent(const glm::vec3& d, const float s) : dir(d), speed(s) {}
+        ProjectileComponent(const ProjectileComponent&) = default;
+        ProjectileComponent(ProjectileComponent&&) = default;
+        ProjectileComponent& operator=(const ProjectileComponent&) = default;
+        ProjectileComponent& operator=(ProjectileComponent&&) = default;
+    };
+
     template <typename ...Components>
     struct ComponentGroup {};
 
     using AllComponents = ComponentGroup<TransformComponent, CameraComponent, ModelComponent, ColliderComponent,
-                                         MovementComponent,
-                                         PlayerCharacterComponent, AICharacterComponent, CollisionComponent,
-                                         WaypointComponent, ParticleEmitterComponent>;
+                                         MovementComponent, PlayerCharacterComponent, AICharacterComponent,
+                                         CollisionComponent, WaypointComponent, ParticleEmitterComponent,
+                                         ProjectileSpawnerComponent, ProjectileComponent>;
 
     class ComponentsManager {
     public:

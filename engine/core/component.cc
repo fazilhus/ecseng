@@ -30,11 +30,11 @@ namespace Ecs {
         }
     }
 
-    ParticleEmitterComponent::ParticleEmitterComponent(const float zo, const glm::vec4& color) : offset(zo) {
+    ParticleEmitterComponent::ParticleEmitterComponent(const glm::vec3& o, const glm::vec4& color) : offset(o) {
         constexpr uint32_t numParticles = 2048;
         emitter.init(numParticles);
         emitter.data = {
-            .origin = glm::vec4(glm::vec3(0.0f, 0.0f, zo), 1.0f),
+            .origin = glm::vec4(offset, 1.0f),
             .dir = glm::vec4(0.0f, 0.0f, 1.0f, 0.0f),
             .startColor = color * 2.0f,
             .endColor = glm::vec4(0, 0, 0, 1.0f),

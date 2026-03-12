@@ -2,32 +2,20 @@
 
 #include "entity.h"
 #include "component.h"
-#include "system.h"
 #include "pool.h"
 
-#include <set>
+#include <unordered_set>
 
 
 namespace Ecs {
+    class SystemsManager;
     class World {
     public:
         World();
         ~World();
 
-        EntityID CreateEntity() {
-            auto res = m_entitiesManager.CreateEntity();
-            m_entities.insert(res);
-            return res;
-        }
-
-        void DestroyEntity(const EntityID id) {
-            auto e_sig = m_entitiesManager.GetSignature(id);
-
-            for (auto& [_, p]: m_componentsManager.GetComponentPools()) { p->Remove(id); }
-
-            m_entities.erase(id);
-            m_entitiesManager.DestroyEntity(id);
-        }
+        EntityID CreateEntity();
+        void DestroyEntity(EntityID id);
 
         template <typename T>
         bool HasComponent(EntityID id) const { return m_componentsManager.HasComponent<T>(id); }
@@ -50,7 +38,7 @@ namespace Ecs {
 
         std::vector<EntityID> GetAllEntitiesBySignature(Signature sig);
         template <ComponentID ...Comps>
-        inline std::vector<EntityID> GetAllEntitiesByComponentIDs() {
+        std::vector<EntityID> GetAllEntitiesByComponentIDs() {
             Signature sig{};
             for (auto s : {Comps...}) {
                 sig |= s;
@@ -59,15 +47,17 @@ namespace Ecs {
         }
 
         void Start();
+        void BeforeFrame();
         void PhysicsUpdate(float dt);
         void Update(float dt);
         void BeforeDraw();
         void Draw();
 
     private:
-        std::set<EntityID> m_entities;
+        std::unordered_set<EntityID> m_entities;
+        std::queue<EntityID> m_to_be_deleted;
         EntityManager m_entitiesManager;
         ComponentsManager m_componentsManager;
-        SystemsManager m_systemsManager;
+        SystemsManager* m_systemsManager;
     };
 } // namespace Ecs

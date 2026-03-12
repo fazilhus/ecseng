@@ -22,6 +22,8 @@ namespace Ecs {
         CT_COLLISION = 1 << 8,
         CT_WAYPOINT = 1 << 9,
         CT_PARTICLE_EMITTER = 1 << 10,
+        CT_PROJECTILE_SPAWNER = 1 << 11,
+        CT_PROJECTILE = 1 << 12,
         CT_MAX = 1 << 31,
     };
 
