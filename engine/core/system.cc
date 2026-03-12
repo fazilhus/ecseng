@@ -29,9 +29,7 @@ namespace Ecs {
 #endif
 
                 if (payload.hit) {
-                    Signature sig = CT_TRANSFORM;
-                    sig |= CT_WAYPOINT;
-                    const auto waypoints = world->GetAllEntitiesBySignature(sig);
+                    const auto waypoints = world->GetAllEntitiesBySignature(CT_WAYPOINT);
                     const auto wp = waypoints[Core::FastRandom() % waypoints.size()];
                     const auto& wp_t_comp = world->GetComponent<TransformComponent>(wp);
                     if (world->HasComponent<AICharacterComponent>(e)) {
@@ -135,12 +133,51 @@ namespace Ecs {
             auto& ch_comp = world->GetComponent<AICharacterComponent>(e);
             auto& mov_comp = world->GetComponent<MovementComponent>(e);
 
-            auto wt_pos = world->GetComponent<TransformComponent>(ch_comp.heading).pos;
-            auto dir = wt_pos - t_comp.pos;
-            if (glm::length(dir) < 2.5f) {
-                ch_comp.heading = world->GetComponent<WaypointComponent>(ch_comp.heading).next;
-                wt_pos = world->GetComponent<TransformComponent>(ch_comp.heading).pos;
-                dir = wt_pos - t_comp.pos;
+            glm::vec3 target{};
+            glm::vec3 dir{};
+            const auto players = world->GetAllEntitiesByComponentIDs<CT_PLAYER_CHARACTER>();
+            auto min_player_dist{1e30f};
+            for (auto p : players) {
+                const auto& p_t_comp = world->GetComponent<TransformComponent>(p);
+                const auto new_dist = glm::distance(t_comp.pos, p_t_comp.pos);
+                if (new_dist < min_player_dist) {
+                    min_player_dist = new_dist;
+                    target = p_t_comp.pos;
+                }
+            }
+
+            switch (ch_comp.behaviour) {
+            case BT_Neutral:
+            case BT_Aggressive: {
+                if (ch_comp.range > min_player_dist) {
+                    ch_comp.state = ST_Acting;
+                } else {
+                    ch_comp.state = ST_Moving;
+                }
+            } break;
+            case BT_Defensive: {
+                if (ch_comp.range > min_player_dist) {
+                    ch_comp.state = ST_Acting;
+                    target *= -1.0f;
+                } else {
+                    ch_comp.state = ST_Moving;
+                }
+            } break;
+            }
+
+            switch (ch_comp.state) {
+            case ST_Moving: {
+                target = world->GetComponent<TransformComponent>(ch_comp.heading).pos;
+                dir = target - t_comp.pos;
+                if (glm::length(dir) < 2.5f) {
+                    ch_comp.heading = world->GetComponent<WaypointComponent>(ch_comp.heading).next;
+                    target = world->GetComponent<TransformComponent>(ch_comp.heading).pos;
+                    dir = target - t_comp.pos;
+                }
+            } break;
+            case ST_Acting: {
+                dir = target - t_comp.pos;
+            } break;
             }
 
             dir = glm::normalize(dir);

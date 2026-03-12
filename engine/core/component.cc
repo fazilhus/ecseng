@@ -16,6 +16,20 @@ namespace Ecs {
         this->projection = p;
     }
 
+    AICharacterComponent::AICharacterComponent(const EntityID h, const BehaviourType b) : heading(h), behaviour(b) {
+        switch (behaviour) {
+        case BT_Aggressive: {
+            range = 15.0f;
+        } break;
+        case BT_Neutral: {
+            range = 15.0f;
+        } break;
+        case BT_Defensive: {
+            range = 15.0f;
+        } break;
+        }
+    }
+
     ParticleEmitterComponent::ParticleEmitterComponent(const float zo, const glm::vec4& color) : offset(zo) {
         constexpr uint32_t numParticles = 2048;
         emitter.init(numParticles);

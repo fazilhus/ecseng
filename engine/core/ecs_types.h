@@ -29,3 +29,13 @@ namespace Ecs {
 
     using Signature = std::uint32_t;
 } // namespace Ecs
+
+enum BehaviourType {
+    BT_Neutral,
+    BT_Aggressive,
+    BT_Defensive,
+};
+enum StateType {
+    ST_Moving,
+    ST_Acting,
+};

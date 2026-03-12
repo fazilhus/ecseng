@@ -239,12 +239,18 @@ namespace Game {
             world->AddComponent<Ecs::ParticleEmitterComponent, Ecs::CT_PARTICLE_EMITTER>(ship, -0.5f, glm::vec4(0.38f, 0.76f, 0.95f, 1.0f));
         }
 
-        auto ai_ship = world->CreateEntity();
-        {
-            world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(ai_ship, glm::vec3(-10.0f, 0.0f, -10.0f), glm::quat(glm::mat4(1.0f)), glm::vec3(1.0f));
+        std::vector<Ecs::EntityID> ai_ships;
+        for (auto i = 0; i < 3; ++i){
+            const auto ai_ship = world->CreateEntity();
+            const auto translation = glm::vec3(
+                Core::RandomFloatNTP() * 20.0f,
+                Core::RandomFloatNTP() * 20.0f,
+                Core::RandomFloatNTP() * 20.0f
+            );
+            world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(ai_ship, translation, glm::quat(glm::mat4(1.0f)), glm::vec3(1.0f));
             world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(ai_ship, ship_model);
             world->AddComponent<Ecs::MovementComponent, Ecs::CT_MOVEMENT>(ai_ship);
-            world->AddComponent<Ecs::AICharacterComponent, Ecs::CT_AI_CHARACTER>(ai_ship, waypoints.front());
+            world->AddComponent<Ecs::AICharacterComponent, Ecs::CT_AI_CHARACTER>(ai_ship, waypoints.front(), static_cast<BehaviourType>(i));
             world->AddComponent<Ecs::CollisionComponent, Ecs::CT_COLLISION>(ai_ship, ship_collider);
             world->AddComponent<Ecs::ParticleEmitterComponent, Ecs::CT_PARTICLE_EMITTER>(ai_ship, -0.5f, glm::vec4(0.76f, 0.38f, 0.95f, 1.0f));
         }

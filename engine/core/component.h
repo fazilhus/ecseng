@@ -95,8 +95,11 @@ namespace Ecs {
 
     struct AICharacterComponent {
         EntityID heading{};
+        BehaviourType behaviour{};
+        StateType state = ST_Moving;
+        float range{};
 
-        AICharacterComponent(const EntityID h) : heading(h) {}
+        AICharacterComponent(const EntityID h, const BehaviourType b);
         AICharacterComponent(const AICharacterComponent&) = default;
         AICharacterComponent(AICharacterComponent&&) = default;
         AICharacterComponent& operator=(const AICharacterComponent&) = default;
