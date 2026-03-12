@@ -59,6 +59,7 @@ namespace Ecs {
     void World::BeforeFrame() {
         while (!m_to_be_deleted.empty()) {
             auto e = m_to_be_deleted.front();
+            m_to_be_deleted.pop();
 
             for (const auto& p: m_componentsManager.GetComponentPools() | std::views::values) {
                 p->Remove(e);

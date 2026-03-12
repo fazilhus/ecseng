@@ -69,7 +69,7 @@ namespace Ecs {
         virtual void BeforeDraw(const std::vector<EntityID>& entities) override;
     };
 
-    struct ProjectileSystem final : public BaseSystemInt<CT_TRANSFORM, CT_PROJECTILE> {
+    struct ProjectileSystem final : public BaseSystemInt<CT_TRANSFORM, CT_COLLISION, CT_PROJECTILE> {
         ProjectileSystem(World* w)
             : BaseSystemInt(w) {}
         virtual void Update(const std::vector<EntityID>& entities, float dt) override;

@@ -229,21 +229,25 @@ namespace Game {
         }
 
         std::vector<Ecs::EntityID> ai_ships;
-        // for (auto i = 0; i < 3; ++i){
-        //     const auto ai_ship = world->CreateEntity();
-        //     const auto translation = glm::vec3(
-        //         Core::RandomFloatNTP() * 20.0f,
-        //         Core::RandomFloatNTP() * 20.0f,
-        //         Core::RandomFloatNTP() * 20.0f
-        //     );
-        //     world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(ai_ship, translation, glm::quat(glm::mat4(1.0f)), glm::vec3(1.0f));
-        //     world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(ai_ship, ship_model);
-        //     world->AddComponent<Ecs::MovementComponent, Ecs::CT_MOVEMENT>(ai_ship);
-        //     world->AddComponent<Ecs::AICharacterComponent, Ecs::CT_AI_CHARACTER>(ai_ship, waypoints.front(), static_cast<BehaviourType>(i));
-        //     world->AddComponent<Ecs::CollisionComponent, Ecs::CT_COLLISION>(ai_ship, ship_collider);
-        //     world->AddComponent<Ecs::ParticleEmitterComponent, Ecs::CT_PARTICLE_EMITTER>(ai_ship, glm::vec3(0.0f, 0.0f, -0.5f), glm::vec4(0.76f, 0.38f, 0.95f, 1.0f));
-        //     world->AddComponent<Ecs::ProjectileSpawnerComponent, Ecs::CT_PROJECTILE_SPAWNER>(ai_ship, glm::vec3(0.0f, 0.0f, 1.0f), 2.0f, laser_proj_model, laser_proj_cmesh);
-        // }
+        for (auto i = 0; i < 3; ++i){
+            const auto ai_ship = world->CreateEntity();
+            ai_ships.push_back(ai_ship);
+            const auto translation = glm::vec3(
+                Core::RandomFloatNTP() * 20.0f,
+                Core::RandomFloatNTP() * 20.0f,
+                Core::RandomFloatNTP() * 20.0f
+            );
+            world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(ai_ship, translation, glm::quat(glm::mat4(1.0f)), glm::vec3(1.0f));
+            world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(ai_ship, ship_model);
+            world->AddComponent<Ecs::MovementComponent, Ecs::CT_MOVEMENT>(ai_ship);
+            world->AddComponent<Ecs::AICharacterComponent, Ecs::CT_AI_CHARACTER>(ai_ship, waypoints.front(), static_cast<BehaviourType>(i));
+            world->AddComponent<Ecs::CollisionComponent, Ecs::CT_COLLISION>(ai_ship, ship_collider);
+            world->AddComponent<Ecs::ProjectileSpawnerComponent, Ecs::CT_PROJECTILE_SPAWNER>(ai_ship, glm::vec3(0.0f, 0.0f, 1.0f), 2.0f, laser_proj_model, laser_proj_cmesh);
+        }
+        world->AddComponent<Ecs::ParticleEmitterComponent, Ecs::CT_PARTICLE_EMITTER>(ai_ships[0], glm::vec3(0.0f, 0.0f, -0.5f), glm::vec4(0.1f, 0.7f, 0.1f, 1.0f));
+        world->AddComponent<Ecs::ParticleEmitterComponent, Ecs::CT_PARTICLE_EMITTER>(ai_ships[1], glm::vec3(0.0f, 0.0f, -0.5f), glm::vec4(0.7f, 0.1f, 0.1f, 1.0f));
+        world->AddComponent<Ecs::ParticleEmitterComponent, Ecs::CT_PARTICLE_EMITTER>(ai_ships[2], glm::vec3(0.0f, 0.0f, -0.5f), glm::vec4(0.6f, 0.6f, 0.1f, 1.0f));
+
 
         std::clock_t c_start = std::clock();
         auto dt = 0.01667f;
@@ -259,6 +263,7 @@ namespace Game {
             glCullFace(GL_BACK);
 
             this->window->Update();
+            world->BeforeFrame();
 
             if (kbd->pressed[Input::Key::Code::End]) { ShaderResource::ReloadShaders(); }
 

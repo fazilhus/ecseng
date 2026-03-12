@@ -80,11 +80,11 @@ namespace Ecs {
             world->AddComponent<TransformComponent, CT_TRANSFORM>(
                 p,
                 translation,
-                t_comp.rot,
+                glm::identity<glm::quat>(),
                 glm::vec3(1.0f)
                 );
             world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(p, ps_comp.mesh);
-            world->AddComponent<Ecs::ColliderComponent, Ecs::CT_COLLIDER>(p, Physics::CreateCollider(ps_comp.cmesh, glm::translate(translation) * glm::mat4_cast(t_comp.rot)));
+            world->AddComponent<Ecs::ColliderComponent, Ecs::CT_COLLIDER>(p, Physics::CreateCollider(ps_comp.cmesh, glm::translate(translation)));
             world->AddComponent<Ecs::ProjectileComponent, CT_PROJECTILE>(
                 p,
                 t_comp.transform * glm::vec4(0, 0, 1.0f, 0.0f),
@@ -232,12 +232,14 @@ namespace Ecs {
     void ProjectileSystem::Update(const std::vector<EntityID>& entities, float dt) {
         for (auto e : entities) {
             auto& t_comp = world->GetComponent<TransformComponent>(e);
+            const auto& c_comp = world->GetComponent<ColliderComponent>(e);
             const auto& p_comp = world->GetComponent<ProjectileComponent>(e);
 
             t_comp.pos += p_comp.dir * p_comp.speed * dt;
             t_comp.transform = glm::translate(t_comp.pos) * glm::mat4_cast(t_comp.rot) * glm::scale(t_comp.scale);
+            Physics::SetTransform(c_comp.collider_id, t_comp.transform);
 
-            if (glm::length(t_comp.pos) > 20.0f) {
+            if (glm::length(t_comp.pos) > 5.0f) {
                 world->DestroyEntity(e);
             }
         }
