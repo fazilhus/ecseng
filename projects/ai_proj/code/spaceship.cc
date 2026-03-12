@@ -13,30 +13,30 @@ using namespace Render;
 
 namespace Game {
     SpaceShip::SpaceShip() {
-        uint32_t numParticles = 2048;
-        this->particleEmitterLeft = new ParticleEmitter(numParticles);
-        this->particleEmitterLeft->data = {
-            .origin = glm::vec4(this->position + (vec3(this->transform[2]) * emitterOffset), 1),
-            .dir = glm::vec4(glm::vec3(-this->transform[2]), 0),
-            .startColor = glm::vec4(0.38f, 0.76f, 0.95f, 1.0f) * 2.0f,
-            .endColor = glm::vec4(0, 0, 0, 1.0f),
-            .numParticles = numParticles,
-            .theta = glm::radians(0.0f),
-            .startSpeed = 1.2f,
-            .endSpeed = 0.0f,
-            .startScale = 0.025f,
-            .endScale = 0.0f,
-            .decayTime = 2.58f,
-            .randomTimeOffsetDist = 2.58f,
-            .looping = 1,
-            .emitterType = 1,
-            .discRadius = 0.020f
-        };
-        this->particleEmitterRight = new ParticleEmitter(numParticles);
-        this->particleEmitterRight->data = this->particleEmitterLeft->data;
-
-        ParticleSystem::Instance()->AddEmitter(this->particleEmitterLeft);
-        ParticleSystem::Instance()->AddEmitter(this->particleEmitterRight);
+        // uint32_t numParticles = 2048;
+        // this->particleEmitterLeft = new ParticleEmitter(numParticles);
+        // this->particleEmitterLeft->data = {
+        //     .origin = glm::vec4(this->position + (vec3(this->transform[2]) * emitterOffset), 1),
+        //     .dir = glm::vec4(glm::vec3(-this->transform[2]), 0),
+        //     .startColor = glm::vec4(0.38f, 0.76f, 0.95f, 1.0f) * 2.0f,
+        //     .endColor = glm::vec4(0, 0, 0, 1.0f),
+        //     .numParticles = numParticles,
+        //     .theta = glm::radians(0.0f),
+        //     .startSpeed = 1.2f,
+        //     .endSpeed = 0.0f,
+        //     .startScale = 0.025f,
+        //     .endScale = 0.0f,
+        //     .decayTime = 2.58f,
+        //     .randomTimeOffsetDist = 2.58f,
+        //     .looping = 1,
+        //     .emitterType = 1,
+        //     .discRadius = 0.020f
+        // };
+        // this->particleEmitterRight = new ParticleEmitter(numParticles);
+        // this->particleEmitterRight->data = this->particleEmitterLeft->data;
+        //
+        // ParticleSystem::Instance()->AddEmitter(this->particleEmitterLeft);
+        // ParticleSystem::Instance()->AddEmitter(this->particleEmitterRight);
     }
 
     void SpaceShip::Update(float dt) {

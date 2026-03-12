@@ -1,8 +1,7 @@
 #include "config.h"
 #include "component.h"
 
-#include <iostream>
-#include <string>
+#include "render/particlesystem.h"
 
 
 namespace Ecs {
@@ -15,6 +14,29 @@ namespace Ecs {
     CameraComponent::CameraComponent(const glm::mat4& v, const glm::mat4& p) {
         this->view = v;
         this->projection = p;
+    }
+
+    ParticleEmitterComponent::ParticleEmitterComponent(const glm::vec3& o, const glm::vec4& color) {
+        constexpr uint32_t numParticles = 2048;
+        emitter.init(numParticles);
+        emitter.data = {
+            .origin = glm::vec4(o, 1.0f),
+            .dir = glm::vec4(0.0f, 0.0f, 1.0f, 0.0f),
+            .startColor = color * 2.0f,
+            .endColor = glm::vec4(0, 0, 0, 1.0f),
+            .numParticles = numParticles,
+            .theta = glm::radians(0.0f),
+            .startSpeed = 1.2f,
+            .endSpeed = 0.0f,
+            .startScale = 0.025f,
+            .endScale = 0.0f,
+            .decayTime = 2.58f,
+            .randomTimeOffsetDist = 2.58f,
+            .looping = 1,
+            .emitterType = 1,
+            .discRadius = 0.020f
+        };
+        Render::ParticleSystem::Instance()->AddEmitter(&emitter);
     }
 
     void ComponentsManager::init() {

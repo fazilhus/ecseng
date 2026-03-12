@@ -70,12 +70,14 @@ namespace Ecs {
     }
 
     template <typename Comp>
-    inline bool ComponentPool<Comp>::Has(EntityID id) const { return id < cap && id < size && dense[sparse[id]] == id; }
+    inline bool ComponentPool<Comp>::Has(EntityID id) const {
+        return id < cap && sparse[id] < size && dense[sparse[id]] == id;
+    }
 
     template <typename Comp>
     inline const Comp& ComponentPool<Comp>::Get(EntityID id) const {
         if (!Has(id))
-            return Comp{};
+            assert(false && "oopser daiser");
         return comps[sparse[id]];
     }
 

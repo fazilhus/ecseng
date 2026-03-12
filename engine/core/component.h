@@ -6,8 +6,14 @@
 #include <typeindex>
 #include <unordered_map>
 
+#include "render/particlesystem.h"
 #include "render/physics.h"
 #include "render/renderdevice.h"
+
+
+namespace Render {
+    struct ParticleEmitter;
+}
 
 
 namespace Ecs {
@@ -59,10 +65,8 @@ namespace Ecs {
         ColliderComponent& operator=(ColliderComponent&&) = default;
     };
 
-    struct PlayerCharacterComponent {
-        EntityID heading{};
+    struct MovementComponent {
         glm::vec3 linearVelocity = glm::vec3(0);
-
         float normalSpeed = 1.0f;
         float boostSpeed = normalSpeed * 2.0f;
         float accelerationFactor = 1.0f;
@@ -74,7 +78,15 @@ namespace Ecs {
         float rotYSmooth = 0;
         float rotZSmooth = 0;
 
-        PlayerCharacterComponent() {}
+        MovementComponent() = default;
+        MovementComponent(const MovementComponent&) = default;
+        MovementComponent(MovementComponent&&) = default;
+        MovementComponent& operator=(const MovementComponent&) = default;
+        MovementComponent& operator=(MovementComponent&&) = default;
+    };
+
+    struct PlayerCharacterComponent {
+        PlayerCharacterComponent() = default;
         PlayerCharacterComponent(const PlayerCharacterComponent&) = default;
         PlayerCharacterComponent(PlayerCharacterComponent&&) = default;
         PlayerCharacterComponent& operator=(const PlayerCharacterComponent&) = default;
@@ -83,16 +95,6 @@ namespace Ecs {
 
     struct AICharacterComponent {
         EntityID heading{};
-        glm::vec3 linearVelocity = glm::vec3(0);
-
-        float normalSpeed = 1.0f;
-        float currentSpeed = 0.0f;
-        float accelerationFactor = 1.0f;
-
-        float rotationZ = 0;
-        float rotXSmooth = 0;
-        float rotYSmooth = 0;
-        float rotZSmooth = 0;
 
         AICharacterComponent(const EntityID h) : heading(h) {}
         AICharacterComponent(const AICharacterComponent&) = default;
@@ -121,11 +123,24 @@ namespace Ecs {
         WaypointComponent& operator=(WaypointComponent&&) = default;
     };
 
+    struct ParticleEmitterComponent {
+        glm::vec3 offset{};
+        Render::ParticleEmitter emitter{};
+
+        ParticleEmitterComponent(const glm::vec3& o, const glm::vec4& color);
+        ParticleEmitterComponent(const ParticleEmitterComponent&) = default;
+        ParticleEmitterComponent(ParticleEmitterComponent&&) = default;
+        ParticleEmitterComponent& operator=(const ParticleEmitterComponent&) = default;
+        ParticleEmitterComponent& operator=(ParticleEmitterComponent&&) = default;
+    };
+
     template <typename ...Components>
     struct ComponentGroup {};
 
     using AllComponents = ComponentGroup<TransformComponent, CameraComponent, ModelComponent, ColliderComponent,
-                                         PlayerCharacterComponent, AICharacterComponent, CollisionComponent, WaypointComponent>;
+                                         MovementComponent,
+                                         PlayerCharacterComponent, AICharacterComponent, CollisionComponent,
+                                         WaypointComponent, ParticleEmitterComponent>;
 
     class ComponentsManager {
     public:

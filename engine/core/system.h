@@ -49,7 +49,7 @@ namespace Ecs {
         virtual void Draw(const std::vector<EntityID>& entities) override;
     };
 
-    struct PlayerControllerSystem final : public BaseSystemInt<CT_TRANSFORM, CT_CAMERA, CT_PLAYERCHARACTER> {
+    struct PlayerControllerSystem final : public BaseSystemInt<CT_TRANSFORM, CT_CAMERA, CT_MOVEMENT, CT_PLAYER_CHARACTER> {
         PlayerControllerSystem(World* w)
             : BaseSystemInt(w) {}
         virtual void Start(const std::vector<EntityID>& entities) override;
@@ -57,16 +57,23 @@ namespace Ecs {
         virtual void BeforeDraw(const std::vector<EntityID>& entities) override;
     };
 
-    struct AIControllerSystem final : public BaseSystemInt<CT_TRANSFORM, CT_AICHARACTER> {
+    struct AIControllerSystem final : public BaseSystemInt<CT_TRANSFORM, CT_MOVEMENT, CT_AI_CHARACTER> {
         AIControllerSystem(World* w)
             : BaseSystemInt(w) {}
         virtual void Update(const std::vector<EntityID>& entities, float dt) override;
     };
 
+    struct ParticleSystem final : public BaseSystemInt<CT_TRANSFORM, CT_MOVEMENT, CT_PARTICLE_EMITTER> {
+        ParticleSystem(World* w)
+            : BaseSystemInt(w) {}
+        virtual void BeforeDraw(const std::vector<EntityID>& entities) override;
+    };
+
     template <typename ...Systems>
     struct SystemGroup {};
 
-    using AllSystems = SystemGroup<PhysicsBodySystem, DrawableSystem, PlayerControllerSystem, AIControllerSystem>;
+    using AllSystems = SystemGroup<PhysicsBodySystem, DrawableSystem, PlayerControllerSystem, AIControllerSystem,
+                                   ParticleSystem>;
 
     class SystemsManager {
     public:

@@ -233,16 +233,20 @@ namespace Game {
             world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(ship, glm::vec3(-15.0f, 0.0f, -5.0f), glm::quat(glm::radians(glm::vec3(0.0f, 90.0f, 0.0f))), glm::vec3(1.0f));
             world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(ship, ship_model);
             world->AddComponent<Ecs::CameraComponent, Ecs::CT_CAMERA>(ship, glm::mat4(1.0f), glm::perspective(glm::radians(90.0f), float(w) / float(h), 0.01f, 1000.f));
-            world->AddComponent<Ecs::PlayerCharacterComponent, Ecs::CT_PLAYERCHARACTER>(ship);
+            world->AddComponent<Ecs::MovementComponent, Ecs::CT_MOVEMENT>(ship);
+            world->AddComponent<Ecs::PlayerCharacterComponent, Ecs::CT_PLAYER_CHARACTER>(ship);
             world->AddComponent<Ecs::CollisionComponent, Ecs::CT_COLLISION>(ship, ship_collider);
+            world->AddComponent<Ecs::ParticleEmitterComponent, Ecs::CT_PARTICLE_EMITTER>(ship, glm::vec3(0.0f, 0.0f, -0.5f), glm::vec4(0.38f, 0.76f, 0.95f, 1.0f));
         }
 
         auto ai_ship = world->CreateEntity();
         {
             world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(ai_ship, glm::vec3(-10.0f, 0.0f, -10.0f), glm::quat(glm::mat4(1.0f)), glm::vec3(1.0f));
             world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(ai_ship, ship_model);
-            world->AddComponent<Ecs::AICharacterComponent, Ecs::CT_AICHARACTER>(ai_ship, waypoints.front());
+            world->AddComponent<Ecs::MovementComponent, Ecs::CT_MOVEMENT>(ai_ship);
+            world->AddComponent<Ecs::AICharacterComponent, Ecs::CT_AI_CHARACTER>(ai_ship, waypoints.front());
             world->AddComponent<Ecs::CollisionComponent, Ecs::CT_COLLISION>(ai_ship, ship_collider);
+            world->AddComponent<Ecs::ParticleEmitterComponent, Ecs::CT_PARTICLE_EMITTER>(ai_ship, glm::vec3(0.0f, 0.0f, -0.5f), glm::vec4(0.76f, 0.38f, 0.95f, 1.0f));
         }
 
         std::clock_t c_start = std::clock();

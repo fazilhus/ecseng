@@ -29,12 +29,20 @@ namespace Ecs {
 #endif
 
                 if (payload.hit) {
-                    const auto waypoints = world->GetAllEntitiesByComponentIDs<CT_TRANSFORM, CT_WAYPOINT>();
-                    const auto wp_t_comp = world->GetComponent<TransformComponent>(waypoints[Core::FastRandom() % waypoints.size()]);
+                    Signature sig = CT_TRANSFORM;
+                    sig |= CT_WAYPOINT;
+                    const auto waypoints = world->GetAllEntitiesBySignature(sig);
+                    const auto wp = waypoints[Core::FastRandom() % waypoints.size()];
+                    const auto& wp_t_comp = world->GetComponent<TransformComponent>(wp);
+                    if (world->HasComponent<AICharacterComponent>(e)) {
+                        auto& ai_comp = world->GetComponent<AICharacterComponent>(e);
+                        const auto& wp_wp_cp = world->GetComponent<WaypointComponent>(wp);
+                        ai_comp.heading = wp_wp_cp.next;
+                    }
                     t_comp.pos = wp_t_comp.pos;
                     t_comp.rot = glm::identity<glm::quat>();
                     t_comp.transform = glm::translate(t_comp.pos) * glm::mat4_cast(t_comp.rot) * glm::scale(t_comp.scale);
-                    Debug::DrawDebugText("HIT", payload.hitPoint, glm::vec4(1, 1, 1, 1));
+
                 }
             }
         }
@@ -60,39 +68,38 @@ namespace Ecs {
         using namespace Render;
         const Keyboard* kbd = GetDefaultKeyboard();
 
-        // Camera* cam = CameraManager::GetCamera(CAMERA_MAIN);
-
         auto& t_comp = world->GetComponent<TransformComponent>(entities[0]);
         auto& cam_comp = world->GetComponent<CameraComponent>(entities[0]);
-        auto& char_comp = world->GetComponent<PlayerCharacterComponent>(entities[0]);
+        const auto& char_comp = world->GetComponent<PlayerCharacterComponent>(entities[0]);
+        auto& mov_comp = world->GetComponent<MovementComponent>(entities[0]);
 
         if (kbd->held[Key::W]) {
             if (kbd->held[Key::Shift])
-                char_comp.currentSpeed = glm::mix(char_comp.currentSpeed, char_comp.boostSpeed, std::min(1.0f, dt * 30.0f));
+                mov_comp.currentSpeed = glm::mix(mov_comp.currentSpeed, mov_comp.boostSpeed, std::min(1.0f, dt * 30.0f));
             else
-                char_comp.currentSpeed = glm::mix(char_comp.currentSpeed, char_comp.normalSpeed, std::min(1.0f, dt * 90.0f));
+                mov_comp.currentSpeed = glm::mix(mov_comp.currentSpeed, mov_comp.normalSpeed, std::min(1.0f, dt * 90.0f));
         }
-        else { char_comp.currentSpeed = 0; }
-        const glm::vec3 desiredVelocity = t_comp.transform * glm::vec4(0, 0, char_comp.currentSpeed, 0.0f);
+        else { mov_comp.currentSpeed = 0; }
+        const glm::vec3 desiredVelocity = t_comp.transform * glm::vec4(0, 0, mov_comp.currentSpeed, 0.0f);
 
-        char_comp.linearVelocity = glm::mix(char_comp.linearVelocity, desiredVelocity, dt * char_comp.accelerationFactor);
+        mov_comp.linearVelocity = glm::mix(mov_comp.linearVelocity, desiredVelocity, dt * mov_comp.accelerationFactor);
 
         const float rotX = kbd->held[Key::Left] ? 1.0f : kbd->held[Key::Right] ? -1.0f : 0.0f;
         const float rotY = kbd->held[Key::Up] ? -1.0f : kbd->held[Key::Down] ? 1.0f : 0.0f;
         const float rotZ = kbd->held[Key::A] ? -1.0f : kbd->held[Key::D] ? 1.0f : 0.0f;
 
-        t_comp.pos += char_comp.linearVelocity * dt * 10.0f;
+        t_comp.pos += mov_comp.linearVelocity * dt * 10.0f;
 
         const float rotationSpeed = 1.8f * dt;
-        char_comp.rotXSmooth = glm::mix(char_comp.rotXSmooth, rotX * rotationSpeed, dt * cam_comp.cam_smooth);
-        char_comp.rotYSmooth = glm::mix(char_comp.rotYSmooth, rotY * rotationSpeed, dt * cam_comp.cam_smooth);
-        char_comp.rotZSmooth = glm::mix(char_comp.rotZSmooth, rotZ * rotationSpeed, dt * cam_comp.cam_smooth);
-        const auto localOrientation = glm::quat(glm::vec3(-char_comp.rotYSmooth, char_comp.rotXSmooth, char_comp.rotZSmooth));
+        mov_comp.rotXSmooth = glm::mix(mov_comp.rotXSmooth, rotX * rotationSpeed, dt * cam_comp.cam_smooth);
+        mov_comp.rotYSmooth = glm::mix(mov_comp.rotYSmooth, rotY * rotationSpeed, dt * cam_comp.cam_smooth);
+        mov_comp.rotZSmooth = glm::mix(mov_comp.rotZSmooth, rotZ * rotationSpeed, dt * cam_comp.cam_smooth);
+        const auto localOrientation = glm::quat(glm::vec3(-mov_comp.rotYSmooth, mov_comp.rotXSmooth, mov_comp.rotZSmooth));
         t_comp.rot *= localOrientation;
-        char_comp.rotationZ -= char_comp.rotXSmooth;
-        char_comp.rotationZ = glm::clamp(char_comp.rotationZ, -45.0f, 45.0f);
-        t_comp.transform = glm::translate(t_comp.pos) * glm::mat4_cast(glm::quat(t_comp.rot)) * glm::mat4_cast(glm::quat(glm::vec3(0, 0, char_comp.rotationZ)));
-        char_comp.rotationZ = glm::mix(char_comp.rotationZ, 0.0f, dt * cam_comp.cam_smooth);
+        mov_comp.rotationZ -= mov_comp.rotXSmooth;
+        mov_comp.rotationZ = glm::clamp(mov_comp.rotationZ, -45.0f, 45.0f);
+        t_comp.transform = glm::translate(t_comp.pos) * glm::mat4_cast(glm::quat(t_comp.rot)) * glm::mat4_cast(glm::quat(glm::vec3(0, 0, mov_comp.rotationZ)));
+        mov_comp.rotationZ = glm::mix(mov_comp.rotationZ, 0.0f, dt * cam_comp.cam_smooth);
 
         // update camera view transform
         const glm::vec3 desiredCamPos = t_comp.pos + glm::vec3(t_comp.transform * glm::vec4(cam_comp.cam_offset, 0));
@@ -127,6 +134,7 @@ namespace Ecs {
         for (const auto e : entities) {
             auto& t_comp = world->GetComponent<TransformComponent>(e);
             auto& ch_comp = world->GetComponent<AICharacterComponent>(e);
+            auto& mov_comp = world->GetComponent<MovementComponent>(e);
 
             auto wt_pos = world->GetComponent<TransformComponent>(ch_comp.heading).pos;
             auto dir = wt_pos - t_comp.pos;
@@ -139,12 +147,30 @@ namespace Ecs {
             dir = glm::normalize(dir);
             const auto target_rot = look_at(dir, glm::vec3(0.0f, 1.0f, 0.0f));
 
-            const glm::vec3 desiredVelocity = t_comp.transform * glm::vec4(0, 0, ch_comp.normalSpeed, 0.0f);
-            ch_comp.linearVelocity = glm::mix(ch_comp.linearVelocity, desiredVelocity, dt * ch_comp.accelerationFactor);
-            t_comp.pos += ch_comp.linearVelocity * 10.0f * dt;
+            const glm::vec3 desiredVelocity = t_comp.transform * glm::vec4(0, 0, mov_comp.normalSpeed, 0.0f);
+            mov_comp.linearVelocity = glm::mix(mov_comp.linearVelocity, desiredVelocity, dt * mov_comp.accelerationFactor);
+            t_comp.pos += mov_comp.linearVelocity * 10.0f * dt;
 
             t_comp.rot = glm::normalize(glm::slerp(t_comp.rot, target_rot, 10.0f * dt));
             t_comp.transform = glm::translate(t_comp.pos) * glm::mat4_cast(glm::quat(t_comp.rot)) * glm::scale(t_comp.scale);
+        }
+    }
+
+    void ParticleSystem::BeforeDraw(const std::vector<EntityID>& entities) {
+        for (auto e : entities) {
+            const auto& t_comp = world->GetComponent<TransformComponent>(e);
+            auto& pe_comp = world->GetComponent<ParticleEmitterComponent>(e);
+            const auto& mov_comp = world->GetComponent<MovementComponent>(e);
+
+            pe_comp.emitter.data.origin = glm::vec4(
+                glm::vec3(t_comp.pos + glm::vec3(t_comp.transform[0])) + (glm::vec3(t_comp.transform[2]) *
+                    pe_comp.offset), 1
+            );
+            pe_comp.emitter.data.dir = glm::vec4(glm::vec3(-t_comp.transform[2]), 0);
+
+            float t = (mov_comp.currentSpeed / mov_comp.normalSpeed);
+            pe_comp.emitter.data.startSpeed = 1.2f + (3.0f * t);
+            pe_comp.emitter.data.endSpeed = 0.0f + (3.0f * t);
         }
     }
 

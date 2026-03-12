@@ -20,7 +20,7 @@ namespace Render {
         glGenBuffers(1, &this->emitterBlockUBO);
     }
 
-    ParticleEmitter::ParticleEmitter(uint32_t numParticles) {
+    void ParticleEmitter::init(uint32_t numParticles) {
         data.numParticles = numParticles;
         glGenBuffers(2, this->bufPositions);
         glGenBuffers(2, this->bufVelocities);

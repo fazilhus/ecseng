@@ -6,7 +6,8 @@
 
 namespace Render {
     struct ParticleEmitter {
-        ParticleEmitter(uint32_t numParticles);
+        ParticleEmitter() = default;
+        void init(uint32_t numParticles);
 
         ~ParticleEmitter();
 
