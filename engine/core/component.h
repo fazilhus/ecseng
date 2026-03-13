@@ -24,6 +24,7 @@ namespace Ecs {
         glm::quat rot{};
         glm::vec3 scale{};
 
+        TransformComponent() = default;
         TransformComponent(const glm::vec3& pos, const glm::quat& rot, const glm::vec3& scale);
         TransformComponent(const TransformComponent&) = default;
         TransformComponent(TransformComponent&&) = default;
@@ -38,6 +39,7 @@ namespace Ecs {
         glm::vec3 cam_offset{};
         float cam_smooth{};
 
+        CameraComponent() = default;
         CameraComponent(const glm::mat4& v, const glm::mat4& p);
         CameraComponent(const CameraComponent&) = default;
         CameraComponent(CameraComponent&&) = default;
@@ -48,6 +50,7 @@ namespace Ecs {
     struct ModelComponent {
         Render::ModelId model_id;
 
+        ModelComponent() = default;
         ModelComponent(const Render::ModelId model_id) : model_id(model_id) {}
         ModelComponent(const ModelComponent&) = default;
         ModelComponent(ModelComponent&&) = default;
@@ -56,9 +59,11 @@ namespace Ecs {
     };
 
     struct ColliderComponent {
-        Physics::ColliderId collider_id;
+        Physics::ColliderMeshId cmesh_id;
+        bool active{};
 
-        ColliderComponent(const Physics::ColliderId cid) : collider_id(cid) {}
+        ColliderComponent() = default;
+        ColliderComponent(const Physics::ColliderMeshId cmid, const bool a) : cmesh_id(cmid), active(a) {}
         ColliderComponent(const ColliderComponent&) = default;
         ColliderComponent(ColliderComponent&&) = default;
         ColliderComponent& operator=(const ColliderComponent&) = default;
@@ -99,7 +104,8 @@ namespace Ecs {
         StateType state = ST_Moving;
         float range{};
 
-        AICharacterComponent(const EntityID h, const BehaviourType b);
+        AICharacterComponent() = default;
+        AICharacterComponent(EntityID h, BehaviourType b);
         AICharacterComponent(const AICharacterComponent&) = default;
         AICharacterComponent(AICharacterComponent&&) = default;
         AICharacterComponent& operator=(const AICharacterComponent&) = default;
@@ -109,6 +115,7 @@ namespace Ecs {
     struct CollisionComponent {
         std::vector<glm::vec3> rays;
 
+        CollisionComponent() = default;
         CollisionComponent(const std::vector<glm::vec3>& v) : rays(v) {}
         CollisionComponent(const CollisionComponent&) = default;
         CollisionComponent(CollisionComponent&&) = default;
@@ -119,6 +126,7 @@ namespace Ecs {
     struct WaypointComponent {
         EntityID prev{}, next{};
 
+        WaypointComponent() = default;
         WaypointComponent(const EntityID p, const EntityID n) : prev(p), next(n) {}
         WaypointComponent(const WaypointComponent&) = default;
         WaypointComponent(WaypointComponent&&) = default;
@@ -130,6 +138,7 @@ namespace Ecs {
         glm::vec3 offset{};
         Render::ParticleEmitter emitter{};
 
+        ParticleEmitterComponent() = default;
         ParticleEmitterComponent(const glm::vec3& o, const glm::vec4& color);
         ParticleEmitterComponent(const ParticleEmitterComponent&) = default;
         ParticleEmitterComponent(ParticleEmitterComponent&&) = default;
@@ -143,6 +152,7 @@ namespace Ecs {
         Render::ModelId mesh;
         Physics::ColliderMeshId cmesh;
 
+        ProjectileSpawnerComponent() = default;
         ProjectileSpawnerComponent(
             const glm::vec3& o, const float s, const Render::ModelId m, const Physics::ColliderMeshId cm
             )
@@ -157,6 +167,7 @@ namespace Ecs {
         glm::vec3 dir;
         float speed;
 
+        ProjectileComponent() = default;
         ProjectileComponent(const glm::vec3& d, const float s) : dir(d), speed(s) {}
         ProjectileComponent(const ProjectileComponent&) = default;
         ProjectileComponent(ProjectileComponent&&) = default;

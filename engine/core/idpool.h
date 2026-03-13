@@ -74,7 +74,7 @@ namespace Util {
     */
     template <typename ID_T>
     void IdPool<ID_T>::Deallocate(ID_T i) {
-        n_assert2(this->IsValid(i), "Tried to deallocate invalid/destroyed id!");
+        if (!this->IsValid(i)) return;
         this->freeIds.push(i.index);
 #if _DEBUG
         // if you get this warning, you might want to consider reserving more bits for the generation.

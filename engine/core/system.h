@@ -37,10 +37,18 @@ namespace Ecs {
         virtual ~BaseSystemInt() override = default;
     };
 
+    struct RaycastPayload {
+        bool hit = false;
+        float hitDistance = 0;
+        glm::vec3 hitPoint;
+        EntityID collider;
+    };
+
     struct PhysicsBodySystem final : public BaseSystemInt<CT_TRANSFORM, CT_COLLISION> {
         PhysicsBodySystem(World* w)
             : BaseSystemInt(w) {}
         virtual void PhysicsUpdate(const std::vector<EntityID>& entities, float dt) override;
+        RaycastPayload Raycast(const glm::vec3& pos, const glm::vec3& dir, float max_dist);
     };
 
     struct DrawableSystem final : public BaseSystemInt<CT_TRANSFORM, CT_MODEL> {
@@ -69,7 +77,7 @@ namespace Ecs {
         virtual void BeforeDraw(const std::vector<EntityID>& entities) override;
     };
 
-    struct ProjectileSystem final : public BaseSystemInt<CT_TRANSFORM, CT_COLLISION, CT_PROJECTILE> {
+    struct ProjectileSystem final : public BaseSystemInt<CT_TRANSFORM, CT_PROJECTILE> {
         ProjectileSystem(World* w)
             : BaseSystemInt(w) {}
         virtual void Update(const std::vector<EntityID>& entities, float dt) override;

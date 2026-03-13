@@ -12,24 +12,25 @@ namespace Ecs {
     constexpr ComponentID MaxComponentCount = 32;
 
     enum ComponentTypes {
-        CT_TRANSFORM = 1 << 1,
-        CT_CAMERA = 1 << 2,
-        CT_MODEL = 1 << 3,
-        CT_COLLIDER = 1 << 4,
-        CT_MOVEMENT = 1 << 5,
-        CT_PLAYER_CHARACTER = 1 << 6,
-        CT_AI_CHARACTER = 1 << 7,
-        CT_COLLISION = 1 << 8,
-        CT_WAYPOINT = 1 << 9,
-        CT_PARTICLE_EMITTER = 1 << 10,
-        CT_PROJECTILE_SPAWNER = 1 << 11,
-        CT_PROJECTILE = 1 << 12,
+        CT_TRANSFORM = 1 << 0,
+        CT_CAMERA = 1 << 1,
+        CT_MODEL = 1 << 2,
+        CT_COLLIDER = 1 << 3,
+        CT_MOVEMENT = 1 << 4,
+        CT_PLAYER_CHARACTER = 1 << 5,
+        CT_AI_CHARACTER = 1 << 6,
+        CT_COLLISION = 1 << 7,
+        CT_WAYPOINT = 1 << 8,
+        CT_PARTICLE_EMITTER = 1 << 9,
+        CT_PROJECTILE_SPAWNER = 1 << 10,
+        CT_PROJECTILE = 1 << 11,
         CT_MAX = 1 << 31,
     };
 
 #define CT_START CT_TRANSFORM
 
     using Signature = std::uint32_t;
+
 } // namespace Ecs
 
 enum BehaviourType {

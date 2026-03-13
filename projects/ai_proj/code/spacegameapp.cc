@@ -101,42 +101,40 @@ namespace Game {
         std::vector<Ecs::EntityID> asteroids;
 
         // Setup asteroids near
-        for (int i = 0; i < 100; i++) {
-            const auto resourceIndex = static_cast<size_t>(Core::FastRandom() % 6);
-            constexpr auto span = 30.0f;
-            const auto translation = glm::vec3(
-                Core::RandomFloatNTP() * span,
-                Core::RandomFloatNTP() * span,
-                Core::RandomFloatNTP() * span
-            );
-            const auto rotationAxis = glm::normalize(translation);
-            const auto rotation = glm::quat(Core::RandomFloatNTP(), rotationAxis);
-            const auto transform = glm::translate(translation) * glm::rotate(rotation.w, glm::axis(rotation)) * glm::scale(glm::vec3(1.0f));
-            const auto e = world->CreateEntity();
-            asteroids.push_back(e);
-            world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(e, models[resourceIndex]);
-            world->AddComponent<Ecs::ColliderComponent, Ecs::CT_COLLIDER>(e, Physics::CreateCollider(colliderMeshes[resourceIndex], transform));
-            world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(e, translation, rotation, glm::vec3(1.0f));
-        }
+        // for (int i = 0; i < 100; i++) {
+        //     const auto resourceIndex = static_cast<size_t>(Core::FastRandom() % 6);
+        //     constexpr auto span = 30.0f;
+        //     const auto translation = glm::vec3(
+        //         Core::RandomFloatNTP() * span,
+        //         Core::RandomFloatNTP() * span,
+        //         Core::RandomFloatNTP() * span
+        //     );
+        //     const auto rotationAxis = glm::normalize(translation);
+        //     const auto rotation = glm::quat(Core::RandomFloatNTP(), rotationAxis);
+        //     const auto e = world->CreateEntity();
+        //     asteroids.push_back(e);
+        //     world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(e, models[resourceIndex]);
+        //     world->AddComponent<Ecs::ColliderComponent, Ecs::CT_COLLIDER>(e, colliderMeshes[resourceIndex], true);
+        //     world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(e, translation, rotation, glm::vec3(1.0f));
+        // }
 
         // Setup asteroids far
-        for (int i = 0; i < 50; i++) {
-            const auto resourceIndex = static_cast<size_t>(Core::FastRandom() % 6);
-            constexpr auto span = 100.0f;
-            const auto translation = glm::vec3(
-                Core::RandomFloatNTP() * span,
-                Core::RandomFloatNTP() * span,
-                Core::RandomFloatNTP() * span
-            );
-            const auto rotationAxis = glm::normalize(translation);
-            const auto rotation = glm::quat(Core::RandomFloatNTP(), rotationAxis);
-            const auto transform = glm::translate(translation) * glm::rotate(rotation.w, glm::axis(rotation)) * glm::scale(glm::vec3(1.0f));
-            const auto e = world->CreateEntity();
-            asteroids.push_back(e);
-            world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(e, models[resourceIndex]);
-            world->AddComponent<Ecs::ColliderComponent, Ecs::CT_COLLIDER>(e, Physics::CreateCollider(colliderMeshes[resourceIndex], transform));
-            world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(e, translation, rotation, glm::vec3(1.0f));
-        }
+        // for (int i = 0; i < 50; i++) {
+        //     const auto resourceIndex = static_cast<size_t>(Core::FastRandom() % 6);
+        //     constexpr auto span = 100.0f;
+        //     const auto translation = glm::vec3(
+        //         Core::RandomFloatNTP() * span,
+        //         Core::RandomFloatNTP() * span,
+        //         Core::RandomFloatNTP() * span
+        //     );
+        //     const auto rotationAxis = glm::normalize(translation);
+        //     const auto rotation = glm::quat(Core::RandomFloatNTP(), rotationAxis);
+        //     const auto e = world->CreateEntity();
+        //     asteroids.push_back(e);
+        //     world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(e, models[resourceIndex]);
+        //     world->AddComponent<Ecs::ColliderComponent, Ecs::CT_COLLIDER>(e, colliderMeshes[resourceIndex], true);
+        //     world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(e, translation, rotation, glm::vec3(1.0f));
+        // }
 
         std::vector<Ecs::EntityID> waypoints;
         for (auto i = 0; i < 4; ++i ) {
@@ -218,18 +216,19 @@ namespace Game {
 
         auto ship = world->CreateEntity();
         {
-            world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(ship, glm::vec3(-15.0f, 0.0f, -5.0f), glm::quat(glm::radians(glm::vec3(0.0f, 90.0f, 0.0f))), glm::vec3(1.0f));
+            world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(ship, glm::vec3(0.0f), glm::quat(glm::radians(glm::vec3(0.0f, 90.0f, 0.0f))), glm::vec3(1.0f));
+            // world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(ship, glm::vec3(-15.0f, 0.0f, -5.0f), glm::quat(glm::radians(glm::vec3(0.0f, 90.0f, 0.0f))), glm::vec3(1.0f));
             world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(ship, ship_model);
             world->AddComponent<Ecs::CameraComponent, Ecs::CT_CAMERA>(ship, glm::mat4(1.0f), glm::perspective(glm::radians(90.0f), float(w) / float(h), 0.01f, 1000.f));
             world->AddComponent<Ecs::MovementComponent, Ecs::CT_MOVEMENT>(ship);
             world->AddComponent<Ecs::PlayerCharacterComponent, Ecs::CT_PLAYER_CHARACTER>(ship);
             world->AddComponent<Ecs::CollisionComponent, Ecs::CT_COLLISION>(ship, ship_collider);
             world->AddComponent<Ecs::ParticleEmitterComponent, Ecs::CT_PARTICLE_EMITTER>(ship, glm::vec3(0.0f, 0.0f, -0.5f), glm::vec4(0.38f, 0.76f, 0.95f, 1.0f));
-            world->AddComponent<Ecs::ProjectileSpawnerComponent, Ecs::CT_PROJECTILE_SPAWNER>(ship, glm::vec3(0.0f, 0.0f, 2.0f), 2.0f, laser_proj_model, laser_proj_cmesh);
+            world->AddComponent<Ecs::ProjectileSpawnerComponent, Ecs::CT_PROJECTILE_SPAWNER>(ship, glm::vec3(0.0f, 0.0f, 2.0f), 10.0f, laser_proj_model, laser_proj_cmesh);
         }
 
         std::vector<Ecs::EntityID> ai_ships;
-        for (auto i = 0; i < 3; ++i){
+        for (auto i = 0; i < 1; ++i){
             const auto ai_ship = world->CreateEntity();
             ai_ships.push_back(ai_ship);
             const auto translation = glm::vec3(
@@ -240,13 +239,13 @@ namespace Game {
             world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(ai_ship, translation, glm::quat(glm::mat4(1.0f)), glm::vec3(1.0f));
             world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(ai_ship, ship_model);
             world->AddComponent<Ecs::MovementComponent, Ecs::CT_MOVEMENT>(ai_ship);
-            world->AddComponent<Ecs::AICharacterComponent, Ecs::CT_AI_CHARACTER>(ai_ship, waypoints.front(), static_cast<BehaviourType>(i));
+            // world->AddComponent<Ecs::AICharacterComponent, Ecs::CT_AI_CHARACTER>(ai_ship, waypoints.front(), static_cast<BehaviourType>(i));
             world->AddComponent<Ecs::CollisionComponent, Ecs::CT_COLLISION>(ai_ship, ship_collider);
             world->AddComponent<Ecs::ProjectileSpawnerComponent, Ecs::CT_PROJECTILE_SPAWNER>(ai_ship, glm::vec3(0.0f, 0.0f, 1.0f), 10.0f, laser_proj_model, laser_proj_cmesh);
         }
         world->AddComponent<Ecs::ParticleEmitterComponent, Ecs::CT_PARTICLE_EMITTER>(ai_ships[0], glm::vec3(0.0f, 0.0f, -0.5f), glm::vec4(0.1f, 0.7f, 0.1f, 1.0f));
-        world->AddComponent<Ecs::ParticleEmitterComponent, Ecs::CT_PARTICLE_EMITTER>(ai_ships[1], glm::vec3(0.0f, 0.0f, -0.5f), glm::vec4(0.7f, 0.1f, 0.1f, 1.0f));
-        world->AddComponent<Ecs::ParticleEmitterComponent, Ecs::CT_PARTICLE_EMITTER>(ai_ships[2], glm::vec3(0.0f, 0.0f, -0.5f), glm::vec4(0.6f, 0.6f, 0.1f, 1.0f));
+        // world->AddComponent<Ecs::ParticleEmitterComponent, Ecs::CT_PARTICLE_EMITTER>(ai_ships[1], glm::vec3(0.0f, 0.0f, -0.5f), glm::vec4(0.7f, 0.1f, 0.1f, 1.0f));
+        // world->AddComponent<Ecs::ParticleEmitterComponent, Ecs::CT_PARTICLE_EMITTER>(ai_ships[2], glm::vec3(0.0f, 0.0f, -0.5f), glm::vec4(0.6f, 0.6f, 0.1f, 1.0f));
 
 
         std::clock_t c_start = std::clock();

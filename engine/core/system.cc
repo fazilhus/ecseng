@@ -10,16 +10,124 @@
 #include "random.h"
 
 
+namespace Physics {
+    struct ColliderMesh;
+}
+
+
 namespace Ecs {
 
+    RaycastPayload PhysicsBodySystem::Raycast(const glm::vec3& pos, const glm::vec3& dir, const float max_dist) {
+        RaycastPayload ret;
+        ret.hitDistance = max_dist;
+        auto start = pos;
+        const auto colliders = world->GetAllEntitiesBySignature(CT_COLLIDER);
+        for (auto e : colliders) {
+            const auto& t_comp = world->GetComponent<TransformComponent>(e);
+            const auto& cl_comp = world->GetComponent<ColliderComponent>(e);
+            if (cl_comp.active) {
+                const auto& mesh = Physics::GetColliderMesh(cl_comp.cmesh_id);
+                glm::vec3 bSphereCenter = t_comp.pos;
+                float radius = mesh.bSphereRadius * t_comp.scale[0];
+
+                // Coarse check against bounding sphere
+                {
+                    glm::vec3 cDir = bSphereCenter - start;
+
+                    float r2 = radius * radius;
+                    float c2 = glm::dot(cDir, cDir);
+
+                    if (c2 < r2)
+                        goto CHECK_MESH; // ray starts within sphere
+
+                    float d = glm::dot(cDir, dir);
+                    if (d < 0.0f)
+                        continue; // ray is pointing away from sphere
+
+                    float discr = d * d - (c2 - r2);
+
+                    // A negative discriminant corresponds to ray missing sphere
+                    if (discr < 0.0f)
+                        continue;
+
+                    // NOTE: this should be equivalent to this: (sqrtf(c2) - radius > ret.hitDistance)), but faster
+                    if ((c2 > (ret.hitDistance * ret.hitDistance) + (2 * radius * ret.hitDistance) + r2))
+                        continue; // ray is too short
+                }
+
+            CHECK_MESH:
+                // transform ray into modelspace
+                glm::mat4 const& invT = glm::inverse(t_comp.transform);
+                glm::vec3 invRayStart = invT * glm::vec4(start, 1.0f);
+                glm::vec3 invRayDir = invT * glm::vec4(dir, 0);
+
+                // fine check against mesh
+                int numTris = (int)mesh.tris.size();
+                for (int i = 0; i < numTris; ++i) {
+                    glm::vec3 const& N = mesh.tris[i].normal;
+
+                    float NdotRayDirection = glm::dot(N, invRayDir);
+                    if (NdotRayDirection < 0)
+                        continue; // backfacing surface
+
+                    glm::vec3 const& A = mesh.tris[i].vertices[0];
+                    glm::vec3 const& B = mesh.tris[i].vertices[1];
+                    glm::vec3 const& C = mesh.tris[i].vertices[2];
+
+                    float d = -glm::dot(N, A);
+                    float t = -(glm::dot(N, invRayStart) + d) / NdotRayDirection;
+
+                    if (t < 0)
+                        continue; //the triangle is behind the ray
+
+                    glm::vec3 P = invRayStart + invRayDir * t;
+
+                    // check triangle bounds
+                    glm::vec3 K; //vector perpendicular to one of three subdivided triangles's plane
+                    glm::vec3 edge0 = B - A;
+                    glm::vec3 vp0 = P - A;
+                    K = glm::cross(vp0, edge0);
+                    if (glm::dot(N, K) < 0)
+                        continue;
+
+                    glm::vec3 edge1 = C - B;
+                    glm::vec3 vp1 = P - B;
+                    K = glm::cross(vp1, edge1);
+                    if (glm::dot(N, K) < 0)
+                        continue;
+
+                    glm::vec3 edge2 = A - C;
+                    glm::vec3 vp2 = P - C;
+                    K = glm::cross(vp2, edge2);
+                    if (glm::dot(N, K) < 0)
+                        continue;
+
+                    // intersection with at least one triangle
+                    if (ret.hitDistance >= t) {
+                        ret.hit = true;
+                        ret.hitDistance = t;
+                        ret.collider = e;
+                    }
+                }
+            }
+        }
+
+        if (ret.hit) {
+            //calculate hitpoint
+            ret.hitPoint = start + dir * ret.hitDistance;
+        }
+
+        return ret;
+    }
+
     void PhysicsBodySystem::PhysicsUpdate(const std::vector<EntityID>& entities, float dt) {
-        for (auto e : entities) {
+        for (const auto e : entities) {
             auto& t_comp = world->GetComponent<TransformComponent>(e);
             const auto& c_comp = world->GetComponent<CollisionComponent>(e);
             for (const auto& v : c_comp.rays) {
                 const auto dir = glm::vec3(t_comp.transform * glm::vec4(glm::normalize(v), 0.0f));
                 const auto len = glm::length(v);
-                Physics::RaycastPayload payload = Physics::Raycast(t_comp.pos, dir, len);
+                const auto payload = Raycast(t_comp.pos, dir, len);
 #if 0
 // #if _DEBUG
                 Debug::DrawLine(
@@ -44,6 +152,11 @@ namespace Ecs {
                     t_comp.pos = wp_t_comp.pos;
                     t_comp.rot = glm::identity<glm::quat>();
                     t_comp.transform = glm::translate(t_comp.pos) * glm::mat4_cast(t_comp.rot) * glm::scale(t_comp.scale);
+
+                    if (world->HasComponent<ProjectileComponent>(payload.collider)) {
+                        std::cout << "Entity destroyed by collision " << payload.collider << '\n';
+                        world->DestroyEntity(payload.collider);
+                    }
                 }
             }
         }
@@ -86,16 +199,18 @@ namespace Ecs {
 
         if (kbd->pressed[Key::Space]) {
             const auto p = world->CreateEntity();
+            std::cout << "Entity created " << p << '\n';
             const auto translation = glm::vec3(t_comp.transform * glm::vec4(ps_comp.offset, 1.0f));
+            const auto rotation = look_at(t_comp.transform * glm::vec4(0, 0, 1.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
             world->AddComponent<TransformComponent, CT_TRANSFORM>(
                 p,
                 translation,
-                look_at(),
+                rotation,
                 glm::vec3(1.0f)
                 );
-            world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(p, ps_comp.mesh);
-            world->AddComponent<Ecs::ColliderComponent, Ecs::CT_COLLIDER>(p, Physics::CreateCollider(ps_comp.cmesh, glm::translate(translation)));
-            world->AddComponent<Ecs::ProjectileComponent, CT_PROJECTILE>(
+            world->AddComponent<ModelComponent, CT_MODEL>(p, ps_comp.mesh);
+            world->AddComponent<ColliderComponent, CT_COLLIDER>(p, ps_comp.cmesh, true);
+            world->AddComponent<ProjectileComponent, CT_PROJECTILE>(
                 p,
                 t_comp.transform * glm::vec4(0, 0, 1.0f, 0.0f),
                 ps_comp.speed
@@ -234,14 +349,13 @@ namespace Ecs {
     void ProjectileSystem::Update(const std::vector<EntityID>& entities, float dt) {
         for (auto e : entities) {
             auto& t_comp = world->GetComponent<TransformComponent>(e);
-            const auto& c_comp = world->GetComponent<ColliderComponent>(e);
             const auto& p_comp = world->GetComponent<ProjectileComponent>(e);
 
             t_comp.pos += p_comp.dir * p_comp.speed * dt;
             t_comp.transform = glm::translate(t_comp.pos) * glm::mat4_cast(t_comp.rot) * glm::scale(t_comp.scale);
-            Physics::SetTransform(c_comp.collider_id, t_comp.transform);
 
-            if (glm::length(t_comp.pos) > 50.0f) {
+            if (glm::length(t_comp.pos) > 20.0f) {
+                std::cout << "Entity destroyed by bounds " << e << '\n';
                 world->DestroyEntity(e);
             }
         }

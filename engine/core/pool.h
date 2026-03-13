@@ -60,7 +60,7 @@ namespace Ecs {
         : size(0), cap(MaxEntityCount) {
         sparse = new EntityID[cap];
         dense = new EntityID[cap];
-        comps.reserve(cap);
+        comps.resize(cap);
     }
 
     template <typename Comp>
@@ -91,7 +91,7 @@ namespace Ecs {
             return;
 
         dense[size] = id;
-        comps.emplace_back(std::forward<Args>(args) ...);
+        ::new(&comps[size]) Comp(std::forward<Args>(args) ...);
         sparse[id] = size++;
     }
 
@@ -101,16 +101,16 @@ namespace Ecs {
             return false;
 
         EntityID di = sparse[id];
-        EntityID si = dense[di];
+        EntityID last = dense[size - 1];
 
         if (di == size - 1) {
             size--;
             return true;
         }
 
-        std::swap(dense[di], dense[size - 1]);
-        std::swap(comps[di], comps.back());
-        sparse[si] = di;
+        dense[di] = last;
+        comps[di] = std::move(comps[size - 1]);
+        sparse[last] = di;
         size--;
         return true;
     }
