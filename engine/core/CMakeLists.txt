@@ -3,19 +3,19 @@
 #--------------------------------------------------------------------------
 
 SET(files_core
-	app.h
-	app.cc
-	debug.cc
-	debug.h
-	random.h
-	random.cc
-	cvar.h
-	cvar.cc
-	idpool.h
-	pool.h
-	pool.cc
-	entity.h
-	entity.cc
+    app.h
+    app.cc
+    debug.cc
+    debug.h
+    random.h
+    random.cc
+    cvar.h
+    cvar.cc
+    idpool.h
+    pool.h
+    pool.cc
+    entity.h
+    entity.cc
     system.h
     system.cc
     world.h
@@ -23,7 +23,8 @@ SET(files_core
     component.h
     component.cc
     ecs_types.h
-	)
+    maths.h
+)
 SOURCE_GROUP("core" FILES ${files_core})
 	
 SET(files_pch ../config.h ../config.cc)

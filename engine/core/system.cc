@@ -7,6 +7,7 @@
 
 #include <gtx/vector_angle.hpp>
 
+#include "maths.h"
 #include "random.h"
 
 
@@ -154,7 +155,6 @@ namespace Ecs {
                     t_comp.transform = glm::translate(t_comp.pos) * glm::mat4_cast(t_comp.rot) * glm::scale(t_comp.scale);
 
                     if (world->HasComponent<ProjectileComponent>(payload.collider)) {
-                        std::cout << "Entity destroyed by collision " << payload.collider << '\n';
                         world->DestroyEntity(payload.collider);
                     }
                 }
@@ -199,7 +199,6 @@ namespace Ecs {
 
         if (kbd->pressed[Key::Space]) {
             const auto p = world->CreateEntity();
-            std::cout << "Entity created " << p << '\n';
             const auto translation = glm::vec3(t_comp.transform * glm::vec4(ps_comp.offset, 1.0f));
             const auto rotation = look_at(t_comp.transform * glm::vec4(0, 0, 1.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
             world->AddComponent<TransformComponent, CT_TRANSFORM>(
@@ -265,12 +264,15 @@ namespace Ecs {
     }
 
 
-
     void AIControllerSystem::Update(const std::vector<EntityID>& entities, float dt) {
         for (const auto e : entities) {
             auto& t_comp = world->GetComponent<TransformComponent>(e);
             auto& ch_comp = world->GetComponent<AICharacterComponent>(e);
             auto& mov_comp = world->GetComponent<MovementComponent>(e);
+
+            if (ch_comp.shoot_timer <= ch_comp.shoot_cooldown) {
+                ch_comp.shoot_timer += dt;
+            }
 
             glm::vec3 target{};
             glm::vec3 dir{};
@@ -284,6 +286,7 @@ namespace Ecs {
                     target = p_t_comp.pos;
                 }
             }
+            const auto min_player_pos = target;
 
             switch (ch_comp.behaviour) {
             case BT_Neutral:
@@ -319,9 +322,33 @@ namespace Ecs {
             } break;
             }
 
+            {
+                const auto tr = look_at(glm::normalize(min_player_pos - t_comp.pos), glm::vec3(0.0f, 1.0f, 0.0f));
+                const auto angle = Math::rad_to_deg(acosf(glm::dot(t_comp.rot, tr)));
+                if (angle < 15.0f && ch_comp.shoot_timer >= ch_comp.shoot_cooldown) {
+                    ch_comp.shoot_timer = 0.0f;
+                    const auto& ps_comp = world->GetComponent<ProjectileSpawnerComponent>(e);
+                    const auto p = world->CreateEntity();
+                    const auto translation = glm::vec3(t_comp.transform * glm::vec4(ps_comp.offset, 1.0f));
+                    const auto rotation = look_at(t_comp.transform * glm::vec4(0, 0, 1.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+                    world->AddComponent<TransformComponent, CT_TRANSFORM>(
+                        p,
+                        translation,
+                        rotation,
+                        glm::vec3(1.0f)
+                        );
+                    world->AddComponent<ModelComponent, CT_MODEL>(p, ps_comp.mesh);
+                    world->AddComponent<ColliderComponent, CT_COLLIDER>(p, ps_comp.cmesh, true);
+                    world->AddComponent<ProjectileComponent, CT_PROJECTILE>(
+                        p,
+                        t_comp.transform * glm::vec4(0, 0, 1.0f, 0.0f),
+                        ps_comp.speed
+                        );
+                }
+            }
+
             dir = glm::normalize(dir);
             const auto target_rot = look_at(dir, glm::vec3(0.0f, 1.0f, 0.0f));
-
             const glm::vec3 desiredVelocity = t_comp.transform * glm::vec4(0, 0, mov_comp.normalSpeed, 0.0f);
             mov_comp.linearVelocity = glm::mix(mov_comp.linearVelocity, desiredVelocity, dt * mov_comp.accelerationFactor);
             t_comp.pos += mov_comp.linearVelocity * 10.0f * dt;
@@ -354,8 +381,7 @@ namespace Ecs {
             t_comp.pos += p_comp.dir * p_comp.speed * dt;
             t_comp.transform = glm::translate(t_comp.pos) * glm::mat4_cast(t_comp.rot) * glm::scale(t_comp.scale);
 
-            if (glm::length(t_comp.pos) > 20.0f) {
-                std::cout << "Entity destroyed by bounds " << e << '\n';
+            if (glm::length(t_comp.pos) > 100.0f) {
                 world->DestroyEntity(e);
             }
         }

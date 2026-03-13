@@ -103,6 +103,8 @@ namespace Ecs {
         BehaviourType behaviour{};
         StateType state = ST_Moving;
         float range{};
+        float shoot_timer{};
+        float shoot_cooldown{0.25f};
 
         AICharacterComponent() = default;
         AICharacterComponent(EntityID h, BehaviourType b);
