@@ -1,0 +1,60 @@
+﻿namespace fb;
+
+struct Vec3 {
+    x: float;
+    y: float;
+    z: float;
+}
+
+struct Quat {
+    x: float;
+    y: float;
+    z: float;
+    w: float;
+}
+
+table PlayerJoin {
+    player_id: uint;
+    name: string;
+}
+
+table PlayerLeft {
+    player_id: uint;
+}
+
+table PlayerDeath {
+    player_id: uint;
+}
+
+table PlayerRespawn {
+    player_id: uint;
+    pos: Vec3;
+}
+
+table EntityState {
+    entity_id: uint;
+    pos: Vec3;
+    rot: Quat;
+    vel: Vec3;
+    dir: Vec3;
+    timestamp: uint;
+}
+
+table BatchState {
+    entity_states: [EntityState];
+}
+
+union Message {
+    PlayerJoin,
+    PlayerLeft,
+    PlayerDeath,
+    PlayerRespawn,
+    EntityState,
+    BatchState,
+}
+
+table Envelope {
+    message: Message;
+}
+
+root_type Envelope;

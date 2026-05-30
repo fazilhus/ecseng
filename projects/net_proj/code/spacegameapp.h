@@ -7,6 +7,7 @@
 */
 //------------------------------------------------------------------------------
 #include "core/app.h"
+#include "core/net.h"
 #include "core/world.h"
 #include "render/window.h"
 
@@ -32,5 +33,9 @@ namespace Game {
 
         Display::Window* window;
         Ecs::World* world;
+        Core::peer peer;
+        Core::server server;
+        uint32_t ip;
+        uint16_t port;
     };
 } // namespace Game

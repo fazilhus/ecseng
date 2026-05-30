@@ -4,6 +4,8 @@
 //------------------------------------------------------------------------------
 #include "config.h"
 #include "spacegameapp.h"
+
+#include <array>
 #include <cstring>
 #include "imgui.h"
 #include "render/renderdevice.h"
@@ -19,6 +21,8 @@
 #include "core/cvar.h"
 #include "render/physics.h"
 #include <chrono>
+#include <iostream>
+
 #include "spaceship.h"
 #include "gtx/quaternion.hpp"
 
@@ -30,8 +34,9 @@ namespace Game {
     //------------------------------------------------------------------------------
     /**
     */
-    SpaceGameApp::SpaceGameApp() {
-        // empty
+    SpaceGameApp::SpaceGameApp()
+        : window(nullptr), world(nullptr), ip(Core::octets_into_ip({127,0,0,1})), port(6969) {
+        this->peer.init();
     }
 
     //------------------------------------------------------------------------------
@@ -39,6 +44,8 @@ namespace Game {
     */
     SpaceGameApp::~SpaceGameApp() {
         // empty
+        this->peer.deinit();
+        this->server.deinit();
     }
 
     //------------------------------------------------------------------------------
@@ -47,7 +54,7 @@ namespace Game {
     bool SpaceGameApp::Open() {
         App::Open();
         this->window = new Display::Window;
-        this->window->SetSize(1920, 1080);
+        this->window->SetSize(1280, 720);
 
         if (this->window->Open()) {
             // set clear color to gray
@@ -226,25 +233,23 @@ namespace Game {
             world->AddComponent<Ecs::ProjectileSpawnerComponent, Ecs::CT_PROJECTILE_SPAWNER>(ship, glm::vec3(0.0f, 0.0f, 2.0f), 30.0f, laser_proj_model, laser_proj_cmesh);
         }
 
-        std::vector<Ecs::EntityID> ai_ships;
-        for (auto i = 0; i < 3; ++i){
-            const auto ai_ship = world->CreateEntity();
-            ai_ships.push_back(ai_ship);
-            const auto translation = glm::vec3(
-                Core::RandomFloatNTP() * 20.0f,
-                Core::RandomFloatNTP() * 20.0f,
-                Core::RandomFloatNTP() * 20.0f
-            );
-            world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(ai_ship, translation, glm::quat(glm::mat4(1.0f)), glm::vec3(1.0f));
-            world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(ai_ship, ship_model);
-            world->AddComponent<Ecs::MovementComponent, Ecs::CT_MOVEMENT>(ai_ship);
-            world->AddComponent<Ecs::AICharacterComponent, Ecs::CT_AI_CHARACTER>(ai_ship, waypoints.front(), static_cast<BehaviourType>(i));
-            world->AddComponent<Ecs::CollisionComponent, Ecs::CT_COLLISION>(ai_ship, ship_collider);
-            world->AddComponent<Ecs::ProjectileSpawnerComponent, Ecs::CT_PROJECTILE_SPAWNER>(ai_ship, glm::vec3(0.0f, 0.0f, 2.0f), 30.0f, laser_proj_model, laser_proj_cmesh);
-        }
-        world->AddComponent<Ecs::ParticleEmitterComponent, Ecs::CT_PARTICLE_EMITTER>(ai_ships[0], glm::vec3(0.0f, 0.0f, -0.5f), glm::vec4(0.1f, 0.7f, 0.1f, 1.0f));
-        world->AddComponent<Ecs::ParticleEmitterComponent, Ecs::CT_PARTICLE_EMITTER>(ai_ships[1], glm::vec3(0.0f, 0.0f, -0.5f), glm::vec4(0.7f, 0.1f, 0.1f, 1.0f));
-        world->AddComponent<Ecs::ParticleEmitterComponent, Ecs::CT_PARTICLE_EMITTER>(ai_ships[2], glm::vec3(0.0f, 0.0f, -0.5f), glm::vec4(0.6f, 0.6f, 0.1f, 1.0f));
+        // std::vector<Ecs::EntityID> ai_ships;
+        // for (auto i = 0; i < 3; ++i){
+        //     const auto ai_ship = world->CreateEntity();
+        //     ai_ships.push_back(ai_ship);
+        //     const auto translation = glm::vec3(
+        //         Core::RandomFloatNTP() * 20.0f,
+        //         Core::RandomFloatNTP() * 20.0f,
+        //         Core::RandomFloatNTP() * 20.0f
+        //     );
+        //     world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(ai_ship, translation, glm::quat(glm::mat4(1.0f)), glm::vec3(1.0f));
+        //     world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(ai_ship, ship_model);
+        //     world->AddComponent<Ecs::MovementComponent, Ecs::CT_MOVEMENT>(ai_ship);
+        //     world->AddComponent<Ecs::AICharacterComponent, Ecs::CT_AI_CHARACTER>(ai_ship, waypoints.front(), static_cast<BehaviourType>(i));
+        //     world->AddComponent<Ecs::CollisionComponent, Ecs::CT_COLLISION>(ai_ship, ship_collider);
+        //     world->AddComponent<Ecs::ProjectileSpawnerComponent, Ecs::CT_PROJECTILE_SPAWNER>(ai_ship, glm::vec3(0.0f, 0.0f, 2.0f), 30.0f, laser_proj_model, laser_proj_cmesh);
+        //     world->AddComponent<Ecs::ParticleEmitterComponent, Ecs::CT_PARTICLE_EMITTER>(ai_ship, glm::vec3(0.0f, 0.0f, -0.5f), glm::vec4(0.1f, 0.7f, 0.1f, 1.0f));
+        // }
 
 
         std::clock_t c_start = std::clock();
@@ -261,6 +266,8 @@ namespace Game {
             glCullFace(GL_BACK);
 
             this->window->Update();
+            server.update();
+            peer.update();
             world->BeforeFrame();
 
             if (kbd->pressed[Input::Key::Code::End]) { ShaderResource::ReloadShaders(); }
@@ -322,6 +329,34 @@ namespace Game {
             if (ImGui::InputInt("LightSphereId", (int*)&lightSphereId))
                 Core::CVarWriteInt(r_draw_light_sphere_id, lightSphereId);
 
+            ImGui::Separator();
+
+            ImGui::Text("Network");
+
+            std::array<int, 4> octets = Core::ip_into_octets(this->ip);
+            if (ImGui::InputInt4("IP Address", &octets[0])) {
+                this->ip = Core::octets_into_ip(octets);
+            }
+            ImGui::SameLine();
+            int p = this->port;
+            if (ImGui::InputInt("Port", &p)) {
+                this->port = p & 0xFFFF;
+            }
+            if (ImGui::Button("Host")) {
+                if (this->server.init(this->port)) {
+                    std::cout << "Listening at port " << this->port << std::endl;
+                    if (this->peer.connect(this->ip, this->port)) {
+                        std::cout << "Peer connected to ip " << Core::ip_into_octets(this->ip) << ":" <<this->port << std::endl;
+                    }
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Connect")) {
+                std::cout << "Connecting to ip " << Core::ip_into_octets(this->ip) << ":" <<this->port << std::endl;
+                if (this->peer.connect(this->ip, this->port)) {
+                    std::cout << "Peer connected to ip " << Core::ip_into_octets(this->ip) << ":" <<this->port << std::endl;
+                }
+            }
             ImGui::End();
 
             Debug::DispatchDebugTextDrawing();
