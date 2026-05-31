@@ -43,8 +43,11 @@ namespace Game {
     /**
     */
     SpaceGameApp::~SpaceGameApp() {
-        // empty
         this->peer.deinit();
+        if (this->m_server_thread.joinable()) {
+            this->m_server_stop = true;
+            this->m_server_thread.join();
+        }
         this->server.deinit();
     }
 
@@ -266,7 +269,6 @@ namespace Game {
             glCullFace(GL_BACK);
 
             this->window->Update();
-            // server.update();
             peer.update();
             world->BeforeFrame();
 
@@ -343,19 +345,29 @@ namespace Game {
                 this->port = p & 0xFFFF;
             }
             if (ImGui::Button("Host")) {
+                if (this->m_server_thread.joinable()) {
+                    this->m_server_stop = true;
+                    this->m_server_thread.join();
+                    this->server.deinit();
+                }
+                this->m_server_stop = false;
+
                 if (this->server.init(this->port)) {
-                    std::cout << "Listening at port " << this->port << std::endl;
-                    if (this->peer.connect(this->ip, this->port)) {
-                        std::cout << "Peer connected to ip " << Core::ip_into_octets(this->ip) << ":" <<this->port << std::endl;
-                    }
+                    std::cout << "[Host] Routing server listening on port " << this->port << '\n';
+                    this->m_server_thread = std::thread([this]() {
+                        while (!this->m_server_stop.load(std::memory_order_relaxed))
+                            this->server.update();
+                    });
+                    if (!this->peer.connect(this->ip, this->port))
+                        std::cout << "[Host] peer.connect() initiation failed\n";
+                } else {
+                    std::cout << "[Host] Failed to start server on port " << this->port << '\n';
                 }
             }
             ImGui::SameLine();
             if (ImGui::Button("Connect")) {
                 std::cout << "Connecting to ip " << Core::ip_into_octets(this->ip) << ":" <<this->port << std::endl;
-                if (this->peer.connect(this->ip, this->port)) {
-                    std::cout << "Peer connected to ip " << Core::ip_into_octets(this->ip) << ":" <<this->port << std::endl;
-                }
+                this->peer.connect(this->ip, this->port);
             }
             ImGui::End();
 

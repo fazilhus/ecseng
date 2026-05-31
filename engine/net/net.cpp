@@ -39,7 +39,9 @@ namespace Core {
         if (!m_initialized)
             return;
         for (const auto peer: m_peers) {
-            std::cout << "[Routing Server] Disconnected from " << Core::ip_into_octets(peer->address.host) << '\n';
+            char ip[40];
+            enet_address_get_host_ip(&peer->address, ip, 40);
+            std::cout << "[Routing Server] Disconnected from " << ip << '\n';
             enet_peer_reset(peer);
         }
         if (m_host != nullptr) {
@@ -92,13 +94,16 @@ namespace Core {
 
                 m_peers.emplace_back(e.peer);
                 enet_host_flush(m_host);
+                std::cout << "[Routing Server] Peer connected from " << ip << '\n';
             }
             break;
-            case ENET_EVENT_TYPE_DISCONNECT: { m_peers.erase(std::ranges::find(m_peers, e.peer)); }
+            case ENET_EVENT_TYPE_DISCONNECT: {
+                m_peers.erase(std::ranges::find(m_peers, e.peer));
+                std::cout << "[Routing Server] Peer disconnected: " << ip << '\n';
+            }
             break;
             case ENET_EVENT_TYPE_RECEIVE: {
-                std::cout << "[Routing Server] Data received lol! " << e.packet->dataLength << " bytes from " << e.peer
-                    << '\n';
+                enet_packet_destroy(e.packet);
             }
             break;
             default:
@@ -131,9 +136,6 @@ namespace Core {
     void peer::deinit() {
         if (!m_initialized)
             return;
-        // for (const auto peer: m_peers) { enet_peer_reset(peer); }
-        // if (m_server_peer != nullptr)
-        //     enet_peer_reset(m_server_peer);
         if (m_host != nullptr)
             enet_host_destroy(m_host);
 
@@ -142,35 +144,33 @@ namespace Core {
     }
 
     bool peer::connect(const uint32_t ip, const uint16_t port) {
-        ENetAddress server_addr;
-        server_addr.host = ip;
-        server_addr.port = port;
-        m_server_peer = enet_host_connect(m_host, &server_addr, 2, 0);
-        if (m_server_peer == nullptr) {
-            std::cout << "[Peer] failed to connect to routing server at " << ip << ":" << port << '\n';
+        if (!m_initialized) {
+            std::cerr << "[Peer] connect() called before init()\n";
             return false;
         }
 
-        ENetEvent e;
-        while (enet_host_service(m_host, &e, 1000) > 0) {
-            std::cout << "[Peer] received event " << e.type << " from " << ip << ":" << port << '\n';
-            if (e.type == ENET_EVENT_TYPE_CONNECT) {
-                return true; // Connection established
-            }
-            if (e.type == ENET_EVENT_TYPE_DISCONNECT || e.type == ENET_EVENT_TYPE_RECEIVE) {
-                enet_packet_destroy(e.packet);
-            }
+        ENetAddress server_addr;
+        server_addr.host = ip;
+        server_addr.port = port;
+
+        char addr_str[40]{};
+        enet_address_get_host_ip(&server_addr, addr_str, sizeof(addr_str));
+        std::cout << "[Peer] Connecting to routing server at " << addr_str << ':' << port << '\n';
+
+        m_server_peer = enet_host_connect(m_host, &server_addr, 2, 0);
+        if (m_server_peer == nullptr) {
+            std::cerr << "[Peer] enet_host_connect returned nullptr (no peer slots?)\n";
+            return false;
         }
-        enet_peer_reset(m_server_peer);
-        std::cout << "[Peer] failed to receive back from routing server\n";
-        return false;
+        enet_host_flush(m_host);
+        return true;
     }
 
-    void peer::disconnect()  {
+    void peer::disconnect() {
         if (m_server_peer != nullptr) {
             enet_peer_disconnect_now(m_server_peer, 0);
         }
-        for (const auto p: m_peers) {
+        for (const auto p : m_peers) {
             enet_peer_disconnect_now(p, 0);
         }
         m_peers.clear();
@@ -187,18 +187,26 @@ namespace Core {
 
             switch (e.type) {
             case ENET_EVENT_TYPE_CONNECT: {
-                std::cout << "[Peer] Connected to " << ip << ":" << &e.peer->address << '\n';
+                if (e.peer == m_server_peer) {
+                    std::cout << "[Peer] Connected to routing server at " << ip << '\n';
+                } else {
+                    std::cout << "[Peer] Connected to P2P peer at " << ip << '\n';
+                    m_peers.emplace_back(e.peer);
+                }
             }
             break;
             case ENET_EVENT_TYPE_DISCONNECT: {
-                std::cout << "[Peer] Disconnected from " << ip << ":" << &e.peer->address << '\n';
-                if (auto it = std::ranges::find(m_peers, e.peer);
-                    it != m_peers.end()) { m_peers.erase(it); }
+                std::cout << "[Peer] Disconnected from " << ip << '\n';
+                if (e.peer == m_server_peer) {
+                    m_server_peer = nullptr;
+                } else if (auto it = std::ranges::find(m_peers, e.peer);
+                           it != m_peers.end()) {
+                    m_peers.erase(it);
+                }
             }
             break;
             case ENET_EVENT_TYPE_RECEIVE: {
-                flatbuffers::Verifier verifier(
-                    reinterpret_cast<const uint8_t*>(e.packet->data), e.packet->dataLength);
+                flatbuffers::Verifier verifier(e.packet->data, e.packet->dataLength);
                 if (!fb::VerifyEnvelopeBuffer(verifier)) {
                     std::cout << "[Peer] Received invalid packet (" << e.packet->dataLength << " bytes)\n";
                     enet_packet_destroy(e.packet);
@@ -211,38 +219,27 @@ namespace Core {
                     const fb::PeerList* peer_list = envelope->message_as_PeerList();
                     if (!peer_list || !peer_list->peers()) break;
                     for (const fb::PeerAddress* pa : *peer_list->peers()) {
-                        ENetAddress addr;
-                        addr.host = pa->host();
-                        addr.port = pa->port();
+                        ENetAddress addr{ pa->host(), pa->port() };
                         char peer_ip[40];
                         enet_address_get_host_ip(&addr, peer_ip, 40);
-                        ENetPeer* p = enet_host_connect(m_host, &addr, 2, 0);
-                        ENetEvent temp_e;
-                        if (enet_host_service(m_host, &temp_e, 1000) == 0 || temp_e.type != ENET_EVENT_TYPE_CONNECT) {
-                            enet_peer_reset(p);
-                            continue;
-                        }
-                        m_peers.emplace_back(p);
+                        std::cout << "[Peer] Connecting to listed peer " << peer_ip << ':' << pa->port() << '\n';
+                        if (!enet_host_connect(m_host, &addr, 2, 0))
+                            std::cerr << "[Peer] No peer slots for " << peer_ip << '\n';
                     }
+                    enet_host_flush(m_host);
                 }
                 break;
 
                 case fb::Message_NewPeer: {
                     const fb::NewPeer* new_peer = envelope->message_as_NewPeer();
                     if (!new_peer || !new_peer->address()) break;
-                    const fb::PeerAddress* pa = new_peer->address();
-                    ENetAddress addr;
-                    addr.host = pa->host();
-                    addr.port = pa->port();
+                    ENetAddress addr{ new_peer->address()->host(), new_peer->address()->port() };
                     char peer_ip[40];
                     enet_address_get_host_ip(&addr, peer_ip, 40);
-                    ENetPeer* p = enet_host_connect(m_host, &addr, 2, 0);
-                    ENetEvent temp_e;
-                    if (enet_host_service(m_host, &temp_e, 1000) == 0 || temp_e.type != ENET_EVENT_TYPE_CONNECT) {
-                        enet_peer_reset(p);
-                        break;
-                    }
-                    m_peers.emplace_back(p);
+                    std::cout << "[Peer] New peer introduced: " << peer_ip << ':' << new_peer->address()->port() << '\n';
+                    if (!enet_host_connect(m_host, &addr, 2, 0))
+                        std::cerr << "[Peer] No peer slots for " << peer_ip << '\n';
+                    enet_host_flush(m_host);
                 }
                 break;
 
@@ -274,18 +271,18 @@ namespace Core {
     }
 
     std::array<int, 4> ip_into_octets(const uint32_t ip) {
-        return {
-            static_cast<int>(ip >> 24 & 0xFF),
-            static_cast<int>(ip >> 16 & 0xFF),
-            static_cast<int>(ip >> 8 & 0xFF),
-            static_cast<int>(ip & 0xFF)
-        };
+        const auto* b = reinterpret_cast<const uint8_t*>(&ip);
+        return { b[0], b[1], b[2], b[3] };
     }
 
     uint32_t octets_into_ip(const std::array<int, 4> octets) {
-        return (static_cast<uint32_t>(octets[0]) << 24)
-            | (static_cast<uint32_t>(octets[1]) << 16)
-            | (static_cast<uint32_t>(octets[2]) << 8)
-            | static_cast<uint32_t>(octets[3]);
+        uint32_t result;
+        auto* b = reinterpret_cast<uint8_t*>(&result);
+        b[0] = static_cast<uint8_t>(octets[0]);
+        b[1] = static_cast<uint8_t>(octets[1]);
+        b[2] = static_cast<uint8_t>(octets[2]);
+        b[3] = static_cast<uint8_t>(octets[3]);
+        return result;
     }
-} // namespace core
+
+} // namespace Core

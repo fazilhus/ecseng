@@ -10,6 +10,8 @@
 #include "../../../engine/net/net.h"
 #include "core/world.h"
 #include "render/window.h"
+#include <atomic>
+#include <thread>
 
 
 namespace Game {
@@ -35,6 +37,8 @@ namespace Game {
         Ecs::World* world;
         Core::peer peer;
         Core::server server;
+        std::thread         m_server_thread;
+        std::atomic<bool>   m_server_stop{false};
         uint32_t ip;
         uint16_t port;
     };
