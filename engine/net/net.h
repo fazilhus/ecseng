@@ -1,11 +1,12 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
 #include <iostream>
 #include <vector>
 #include <enet/enet.h>
 
-#include "netbuf.h"
+#include "protocol.h"
 
 inline std::ostream& operator<<(std::ostream& os, std::array<int, 4> ip_octets) {
     os << ip_octets[0] << '.' << ip_octets[1] << '.' << ip_octets[2] << '.' << ip_octets[3];
@@ -19,12 +20,6 @@ namespace Core {
 
     class server {
     public:
-        enum class peer_cmd {
-            None,
-            PeerList,
-            NewPeer,
-        };
-
         explicit server();
         ~server();
 
@@ -37,19 +32,10 @@ namespace Core {
         uint16_t m_port;
         ENetHost* m_host;
         std::vector<ENetPeer*> m_peers;
-        netbuf m_buf;
     };
 
     class peer {
     public:
-        enum class peer_cmd {
-            None,
-            PeerList,
-            NewPeer,
-            Ping,
-            Pong,
-        };
-
         explicit peer();
         ~peer();
 
@@ -65,7 +51,6 @@ namespace Core {
         ENetHost* m_host;
         ENetPeer* m_server_peer;
         std::vector<ENetPeer*> m_peers;
-        netbuf m_write_buf;
     };
 
     std::array<int, 4> ip_into_octets(uint32_t ip);

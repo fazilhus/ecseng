@@ -44,6 +44,23 @@ table BatchState {
     entity_states: [EntityState];
 }
 
+// Routing / coordination messages
+struct PeerAddress {
+    host: uint32;
+    port: uint16;
+}
+
+table PeerList {
+    peers: [PeerAddress];
+}
+
+table NewPeer {
+    address: PeerAddress;
+}
+
+table Ping {}
+table Pong {}
+
 union Message {
     PlayerJoin,
     PlayerLeft,
@@ -51,6 +68,10 @@ union Message {
     PlayerRespawn,
     EntityState,
     BatchState,
+    PeerList,
+    NewPeer,
+    Ping,
+    Pong,
 }
 
 table Envelope {

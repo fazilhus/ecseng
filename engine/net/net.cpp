@@ -1,4 +1,5 @@
 #include "net.h"
+#include "protocol.h"
 
 #include <algorithm>
 #include <array>
@@ -60,25 +61,33 @@ namespace Core {
 
             switch (e.type) {
             case ENET_EVENT_TYPE_CONNECT: {
-                m_buf.reset();
-                m_buf.write(peer_cmd::PeerList);
-                m_buf.write(static_cast<uint32_t>(m_peers.size()));
-                for (auto p: m_peers) {
-                    m_buf.write(p->address.host);
-                    m_buf.write(p->address.port);
+                // Send PeerList to the newly connected peer
+                {
+                    flatbuffers::FlatBufferBuilder fbb;
+                    std::vector<fb::PeerAddress> addrs;
+                    addrs.reserve(m_peers.size());
+                    for (const auto p : m_peers)
+                        addrs.emplace_back(p->address.host, p->address.port);
+                    auto peer_list = fb::CreatePeerListDirect(fbb, &addrs);
+                    auto envelope = fb::CreateEnvelope(fbb, fb::Message_PeerList, peer_list.Union());
+                    fbb.Finish(envelope);
+                    ENetPacket* pkt = enet_packet_create(
+                        fbb.GetBufferPointer(), fbb.GetSize(), ENET_PACKET_FLAG_RELIABLE);
+                    if (enet_peer_send(e.peer, 0, pkt) != 0) enet_packet_destroy(pkt);
                 }
-                ENetPacket* packet_peer_list = enet_packet_create(
-                    m_buf.m_buffer, m_buf.m_size, ENET_PACKET_FLAG_RELIABLE
-                );
-                if (enet_peer_send(e.peer, 0, packet_peer_list) != 0) { enet_packet_destroy(packet_peer_list); }
 
-                m_buf.reset();
-                m_buf.write(peer_cmd::NewPeer);
-                m_buf.write(e.peer->address.host);
-                m_buf.write(e.peer->address.port);
-                for (const auto peer: m_peers) {
-                    if (ENetPacket* pkt = enet_packet_create(m_buf.m_buffer, m_buf.m_size, ENET_PACKET_FLAG_RELIABLE);
-                        enet_peer_send(peer, 0, pkt) != 0) { enet_packet_destroy(pkt); }
+                // Broadcast NewPeer to all existing peers
+                {
+                    flatbuffers::FlatBufferBuilder fbb;
+                    fb::PeerAddress addr(e.peer->address.host, e.peer->address.port);
+                    auto new_peer = fb::CreateNewPeer(fbb, &addr);
+                    auto envelope = fb::CreateEnvelope(fbb, fb::Message_NewPeer, new_peer.Union());
+                    fbb.Finish(envelope);
+                    for (const auto p : m_peers) {
+                        ENetPacket* pkt = enet_packet_create(
+                            fbb.GetBufferPointer(), fbb.GetSize(), ENET_PACKET_FLAG_RELIABLE);
+                        if (enet_peer_send(p, 0, pkt) != 0) enet_packet_destroy(pkt);
+                    }
                 }
 
                 m_peers.emplace_back(e.peer);
@@ -143,7 +152,7 @@ namespace Core {
         }
 
         ENetEvent e;
-        while (enet_host_service(m_host, &e, 32) > 0) {
+        while (enet_host_service(m_host, &e, 1000) > 0) {
             std::cout << "[Peer] received event " << e.type << " from " << ip << ":" << port << '\n';
             if (e.type == ENET_EVENT_TYPE_CONNECT) {
                 return true; // Connection established
@@ -188,18 +197,23 @@ namespace Core {
             }
             break;
             case ENET_EVENT_TYPE_RECEIVE: {
-                netrdbuf read_buffer(reinterpret_cast<char*>(e.packet->data), e.packet->dataLength);
-                peer_cmd cmd;
-                if (!read_buffer.read<peer_cmd>(cmd)) break;
-                switch (cmd) {
-                case peer_cmd::PeerList: {
-                    uint32_t num_peers;
-                    read_buffer.read<uint32_t>(num_peers);
-                    for (uint32_t i = 0; i < num_peers; i++) {
-                        ENetAddress addr;
-                        read_buffer.read<uint32_t>(addr.host);
-                        read_buffer.read<uint16_t>(addr.port);
+                flatbuffers::Verifier verifier(
+                    reinterpret_cast<const uint8_t*>(e.packet->data), e.packet->dataLength);
+                if (!fb::VerifyEnvelopeBuffer(verifier)) {
+                    std::cout << "[Peer] Received invalid packet (" << e.packet->dataLength << " bytes)\n";
+                    enet_packet_destroy(e.packet);
+                    break;
+                }
+                const fb::Envelope* envelope = fb::GetEnvelope(e.packet->data);
+                switch (envelope->message_type()) {
 
+                case fb::Message_PeerList: {
+                    const fb::PeerList* peer_list = envelope->message_as_PeerList();
+                    if (!peer_list || !peer_list->peers()) break;
+                    for (const fb::PeerAddress* pa : *peer_list->peers()) {
+                        ENetAddress addr;
+                        addr.host = pa->host();
+                        addr.port = pa->port();
                         char peer_ip[40];
                         enet_address_get_host_ip(&addr, peer_ip, 40);
                         ENetPeer* p = enet_host_connect(m_host, &addr, 2, 0);
@@ -212,38 +226,43 @@ namespace Core {
                     }
                 }
                 break;
-                case peer_cmd::NewPeer: {
-                    ENetAddress addr;
-                    read_buffer.read<uint32_t>(addr.host);
-                    read_buffer.read<uint16_t>(addr.port);
 
+                case fb::Message_NewPeer: {
+                    const fb::NewPeer* new_peer = envelope->message_as_NewPeer();
+                    if (!new_peer || !new_peer->address()) break;
+                    const fb::PeerAddress* pa = new_peer->address();
+                    ENetAddress addr;
+                    addr.host = pa->host();
+                    addr.port = pa->port();
                     char peer_ip[40];
                     enet_address_get_host_ip(&addr, peer_ip, 40);
                     ENetPeer* p = enet_host_connect(m_host, &addr, 2, 0);
                     ENetEvent temp_e;
                     if (enet_host_service(m_host, &temp_e, 1000) == 0 || temp_e.type != ENET_EVENT_TYPE_CONNECT) {
                         enet_peer_reset(p);
-                        continue;
+                        break;
                     }
                     m_peers.emplace_back(p);
                 }
                 break;
-                case peer_cmd::Ping: {
-                    std::cout << "Ping from " << ip << ":" << &e.peer->address << '\n';
 
-                    m_write_buf.reset();
-                    m_write_buf.write(peer_cmd::Pong);
-                    ENetPacket* pack = enet_packet_create(
-                        m_write_buf.m_buffer, m_write_buf.m_size, ENET_PACKET_FLAG_RELIABLE
-                    );
-                    enet_peer_send(e.peer, 0, pack);
+                case fb::Message_Ping: {
+                    std::cout << "[Peer] Ping from " << ip << '\n';
+                    flatbuffers::FlatBufferBuilder fbb;
+                    auto pong = fb::CreatePong(fbb);
+                    auto env_out = fb::CreateEnvelope(fbb, fb::Message_Pong, pong.Union());
+                    fbb.Finish(env_out);
+                    ENetPacket* pkt = enet_packet_create(
+                        fbb.GetBufferPointer(), fbb.GetSize(), ENET_PACKET_FLAG_RELIABLE);
+                    if (enet_peer_send(e.peer, 0, pkt) != 0) enet_packet_destroy(pkt);
                 }
                 break;
-                case peer_cmd::Pong: { std::cout << "Pong from " << ip << ":" << &e.peer->address << '\n'; }
+
+                case fb::Message_Pong:
+                    std::cout << "[Peer] Pong from " << ip << '\n';
                 break;
-                case peer_cmd::None:
-                default: {}
-                    break;
+
+                default: break;
                 }
                 enet_packet_destroy(e.packet);
             }
