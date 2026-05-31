@@ -7,7 +7,7 @@
 */
 //------------------------------------------------------------------------------
 #include "core/app.h"
-#include "core/net.h"
+#include "../../../engine/net/net.h"
 #include "core/world.h"
 #include "render/window.h"
 

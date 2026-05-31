@@ -2,8 +2,6 @@
 # core
 #--------------------------------------------------------------------------
 
-flat_compile(protocol.fbs)
-
 SET(files_core
     app.h
     app.cc
@@ -26,9 +24,6 @@ SET(files_core
     component.cc
     ecs_types.h
     maths.h
-    netbuf.h
-    net.h
-    net.cpp
 )
 SOURCE_GROUP("core" FILES ${files_core})
 	
@@ -36,6 +31,5 @@ SET(files_pch ../config.h ../config.cc)
 SOURCE_GROUP("pch" FILES ${files_pch})
 ADD_LIBRARY(core STATIC ${files_core} ${files_pch})
 TARGET_PCH(core ../)
-ADD_DEPENDENCIES(core glew enet)
-include_directories("${abs_output_folder}/")
-TARGET_LINK_LIBRARIES(core PUBLIC engine exts glew enet soloud protocol)
+ADD_DEPENDENCIES(core glew)
+TARGET_LINK_LIBRARIES(core PUBLIC engine exts glew soloud)

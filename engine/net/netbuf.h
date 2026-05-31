@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <cstdlib>
 
 
@@ -17,9 +17,11 @@ namespace Core {
         }
 
         template<typename T>
-        void write(const T& value) {
+        [[nodiscard]] bool write(const T& value) {
+            if (m_size + sizeof(T) > m_max_size) return false;
             memcpy(m_buffer + m_size, &value, sizeof(T));
             m_size += sizeof(T);
+            return true;
         }
 
         void reset() {
@@ -43,10 +45,11 @@ namespace Core {
         }
 
         template<typename T>
-        T read() {
-            T* ret = reinterpret_cast<T*>(m_buffer + m_cursor);
+        [[nodiscard]] bool read(T& out) {
+            if (m_cursor + sizeof(T) > m_size) return false;
+            out = *reinterpret_cast<T*>(m_buffer + m_cursor);
             m_cursor += sizeof(T);
-            return *ret;
+            return true;
         }
 
         char* m_buffer;

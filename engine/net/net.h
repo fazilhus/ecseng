@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <array>
 #include <iostream>
@@ -57,7 +57,7 @@ namespace Core {
         void deinit();
 
         bool connect(uint32_t ip, uint16_t port);
-        void disconnect() const;
+        void disconnect();
 
         void update();
 

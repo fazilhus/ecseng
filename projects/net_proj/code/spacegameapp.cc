@@ -266,7 +266,7 @@ namespace Game {
             glCullFace(GL_BACK);
 
             this->window->Update();
-            server.update();
+            // server.update();
             peer.update();
             world->BeforeFrame();
 
