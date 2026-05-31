@@ -4,9 +4,8 @@
 //------------------------------------------------------------------------------
 #include "config.h"
 #include "spacegameapp.h"
-
 #include <array>
-#include <cstring>
+#include <random>
 #include "imgui.h"
 #include "render/renderdevice.h"
 #include "render/shaderresource.h"
@@ -22,356 +21,526 @@
 #include "render/physics.h"
 #include <chrono>
 #include <iostream>
-
-#include "spaceship.h"
 #include "gtx/quaternion.hpp"
+#include <enet/enet.h>
 
 using namespace Display;
 using namespace Render;
 
-
 namespace Game {
-    //------------------------------------------------------------------------------
-    /**
-    */
-    SpaceGameApp::SpaceGameApp()
-        : window(nullptr), world(nullptr), ip(Core::octets_into_ip({127,0,0,1})), port(6969) {
-        this->peer.init();
+
+//------------------------------------------------------------------------------
+// Helpers
+//------------------------------------------------------------------------------
+
+namespace {
+    constexpr float NET_TICK = 1.f / 20.f;
+
+    inline fb::Vec3 to_fb(const glm::vec3& v) { return { v.x, v.y, v.z }; }
+    inline fb::Quat to_fb(const glm::quat& q) { return { q.x, q.y, q.z, q.w }; }
+    inline glm::vec3 from_fb(const fb::Vec3& v) { return { v.x(), v.y(), v.z() }; }
+    inline glm::quat from_fb(const fb::Quat& q) { return { q.w(), q.x(), q.y(), q.z() }; }
+} // anonymous
+
+//------------------------------------------------------------------------------
+/**
+*/
+SpaceGameApp::SpaceGameApp()
+    : window(nullptr), world(nullptr),
+      ip(Core::octets_into_ip({127, 0, 0, 1})), port(6969)
+{
+    std::mt19937 rng{ std::random_device{}() };
+    m_local_player_id = std::uniform_int_distribution(1u, UINT32_MAX)(rng);
+    std::cout << "[Net] Local player_id = " << m_local_player_id << '\n';
+
+    this->peer.init();
+}
+
+//------------------------------------------------------------------------------
+/**
+*/
+SpaceGameApp::~SpaceGameApp() {
+    this->peer.deinit();
+    if (this->m_server_thread.joinable()) {
+        this->m_server_stop = true;
+        this->m_server_thread.join();
     }
+    this->server.deinit();
+}
 
-    //------------------------------------------------------------------------------
-    /**
-    */
-    SpaceGameApp::~SpaceGameApp() {
-        this->peer.deinit();
-        if (this->m_server_thread.joinable()) {
-            this->m_server_stop = true;
-            this->m_server_thread.join();
-        }
-        this->server.deinit();
+//------------------------------------------------------------------------------
+/**
+*/
+bool SpaceGameApp::Open() {
+    App::Open();
+    this->window = new Display::Window;
+    this->window->SetSize(1280, 720);
+
+    if (this->window->Open()) {
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        RenderDevice::Init();
+        this->window->SetUiRender([this]() { this->RenderUI(); });
+        return true;
     }
+    return false;
+}
 
-    //------------------------------------------------------------------------------
-    /**
-    */
-    bool SpaceGameApp::Open() {
-        App::Open();
-        this->window = new Display::Window;
-        this->window->SetSize(1280, 720);
-
-        if (this->window->Open()) {
-            // set clear color to gray
-            glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-
-            RenderDevice::Init();
-
-            // set ui rendering function
-            this->window->SetUiRender([this]() { this->RenderUI(); });
-
-            return true;
-        }
-        return false;
+//------------------------------------------------------------------------------
+/**
+*/
+void SpaceGameApp::Broadcast(const flatbuffers::FlatBufferBuilder& fbb, bool reliable) {
+    const enet_uint32 flags = reliable ? ENET_PACKET_FLAG_RELIABLE : 0;
+    for (auto* ep : peer.m_peers) {
+        ENetPacket* pkt = enet_packet_create(fbb.GetBufferPointer(), fbb.GetSize(), flags);
+        if (enet_peer_send(ep, 0, pkt) != 0)
+            enet_packet_destroy(pkt);
     }
+}
 
-    //------------------------------------------------------------------------------
-    /**
-    */
-    void SpaceGameApp::Run() {
-        int w;
-        int h;
-        this->window->GetSize(w, h);
-
-        this->world = new Ecs::World{};
-
-        glm::mat4 projection = glm::perspective(glm::radians(90.0f), float(w) / float(h), 0.01f, 1000.f);
-        Camera* cam = CameraManager::GetCamera(CAMERA_MAIN);
-        cam->projection = projection;
-
-        // load all resources
-        ModelId models[6] = {
-            LoadModel("assets/space/Asteroid_1.glb"),
-            LoadModel("assets/space/Asteroid_2.glb"),
-            LoadModel("assets/space/Asteroid_3.glb"),
-            LoadModel("assets/space/Asteroid_4.glb"),
-            LoadModel("assets/space/Asteroid_5.glb"),
-            LoadModel("assets/space/Asteroid_6.glb")
-        };
-        ModelId laser_proj_model = LoadModel("assets/space/laser.glb");
-
-        Physics::ColliderMeshId colliderMeshes[6] = {
-            Physics::LoadColliderMesh("assets/space/Asteroid_1_physics.glb"),
-            Physics::LoadColliderMesh("assets/space/Asteroid_2_physics.glb"),
-            Physics::LoadColliderMesh("assets/space/Asteroid_3_physics.glb"),
-            Physics::LoadColliderMesh("assets/space/Asteroid_4_physics.glb"),
-            Physics::LoadColliderMesh("assets/space/Asteroid_5_physics.glb"),
-            Physics::LoadColliderMesh("assets/space/Asteroid_6_physics.glb")
-        };
-        Physics::ColliderMeshId laser_proj_cmesh = Physics::LoadColliderMesh("assets/space/laser.glb");
-
-        std::vector<Ecs::EntityID> asteroids;
-
-        // Setup asteroids near
-        for (int i = 0; i < 100; i++) {
-            const auto resourceIndex = static_cast<size_t>(Core::FastRandom() % 6);
-            constexpr auto span = 30.0f;
-            const auto translation = glm::vec3(
-                Core::RandomFloatNTP() * span,
-                Core::RandomFloatNTP() * span,
-                Core::RandomFloatNTP() * span
-            );
-            const auto rotationAxis = glm::normalize(translation);
-            const auto rotation = glm::quat(Core::RandomFloatNTP(), rotationAxis);
-            const auto e = world->CreateEntity();
-            asteroids.push_back(e);
-            world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(e, models[resourceIndex]);
-            world->AddComponent<Ecs::ColliderComponent, Ecs::CT_COLLIDER>(e, colliderMeshes[resourceIndex], true);
-            world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(e, translation, rotation, glm::vec3(1.0f));
-        }
-
-        // Setup asteroids far
-        for (int i = 0; i < 50; i++) {
-            const auto resourceIndex = static_cast<size_t>(Core::FastRandom() % 6);
-            constexpr auto span = 100.0f;
-            const auto translation = glm::vec3(
-                Core::RandomFloatNTP() * span,
-                Core::RandomFloatNTP() * span,
-                Core::RandomFloatNTP() * span
-            );
-            const auto rotationAxis = glm::normalize(translation);
-            const auto rotation = glm::quat(Core::RandomFloatNTP(), rotationAxis);
-            const auto e = world->CreateEntity();
-            asteroids.push_back(e);
-            world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(e, models[resourceIndex]);
-            world->AddComponent<Ecs::ColliderComponent, Ecs::CT_COLLIDER>(e, colliderMeshes[resourceIndex], true);
-            world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(e, translation, rotation, glm::vec3(1.0f));
-        }
-
-        std::vector<Ecs::EntityID> waypoints;
-        for (auto i = 0; i < 4; ++i ) {
-            const auto e = world->CreateEntity();
-            waypoints.push_back(e);
-        }
+//------------------------------------------------------------------------------
+void SpaceGameApp::ProcessNetEvents() {
+    for (ENetPeer* ep : peer.m_connected_peers) {
         {
-            const auto zero_rot = glm::quat_cast(glm::identity<glm::mat4>());
-            world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(waypoints[0], glm::vec3(-10.0f, 0.0f, -10.0f), zero_rot, glm::vec3(1.0f));
-            world->AddComponent<Ecs::WaypointComponent, Ecs::CT_WAYPOINT>(waypoints[0], waypoints[3], waypoints[1]);
-
-            world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(waypoints[1], glm::vec3(-10.0f, 0.0f, 10.0f), zero_rot, glm::vec3(1.0f));
-            world->AddComponent<Ecs::WaypointComponent, Ecs::CT_WAYPOINT>(waypoints[1], waypoints[0], waypoints[2]);
-
-            world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(waypoints[2], glm::vec3(10.0f, 0.0f, 10.0f), zero_rot, glm::vec3(1.0f));
-            world->AddComponent<Ecs::WaypointComponent, Ecs::CT_WAYPOINT>(waypoints[2], waypoints[1], waypoints[3]);
-
-            world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(waypoints[3], glm::vec3(10.0f, 0.0f, -10.0f), zero_rot, glm::vec3(1.0f));
-            world->AddComponent<Ecs::WaypointComponent, Ecs::CT_WAYPOINT>(waypoints[3], waypoints[2], waypoints[0]);
+            flatbuffers::FlatBufferBuilder fbb;
+            auto name = fbb.CreateString("");
+            auto join = fb::CreatePlayerJoin(fbb, m_local_player_id, name);
+            auto env  = fb::CreateEnvelope(fbb, fb::Message_PlayerJoin, join.Union());
+            fbb.Finish(env);
+            ENetPacket* pkt = enet_packet_create(
+                fbb.GetBufferPointer(), fbb.GetSize(), ENET_PACKET_FLAG_RELIABLE);
+            enet_peer_send(ep, 0, pkt);
         }
 
-        // Setup skybox
-        std::vector<const char*> skybox
-        {
-            "assets/space/bg.png",
-            "assets/space/bg.png",
-            "assets/space/bg.png",
-            "assets/space/bg.png",
-            "assets/space/bg.png",
-            "assets/space/bg.png"
-        };
-        TextureResourceId skyboxId = TextureResource::LoadCubemap("skybox", skybox, true);
-        RenderDevice::SetSkybox(skyboxId);
+        const auto ghost = world->CreateEntity();
+        world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(
+            ghost,
+            glm::vec3(0.f),
+            glm::identity<glm::quat>(),
+            glm::vec3(1.f));
+        world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(
+            ghost, LoadModel("assets/space/spaceship.glb"));
+        world->AddComponent<Ecs::DeadReckoningComponent, Ecs::CT_DEAD_RECKONING>(
+            ghost, 0u);
 
-        Input::Keyboard* kbd = Input::GetDefaultKeyboard();
+        RemotePeer rp;
+        rp.enet_peer  = ep;
+        rp.player_id  = 0;
+        rp.ghost_ship = ghost;
+        m_remote_peers[ep] = rp;
 
-        const int numLights = 40;
+        char addr[40];
+        enet_address_get_host_ip(&ep->address, addr, 40);
+        std::cout << "[Game] Spawned ghost ship for peer at " << addr << '\n';
+    }
+    peer.m_connected_peers.clear();
+
+    for (ENetPeer* ep : peer.m_disconnected_peers) {
+        if (auto it = m_remote_peers.find(ep); it != m_remote_peers.end()) {
+            world->DestroyEntity(it->second.ghost_ship);
+            m_remote_peers.erase(it);
+            std::cout << "[Game] Removed ghost ship for disconnected peer\n";
+        }
+    }
+    peer.m_disconnected_peers.clear();
+
+    for (const auto& [from, data] : peer.m_inbox) {
+        switch (const fb::Envelope* env = fb::GetEnvelope(data.data()); env->message_type()) {
+
+        case fb::Message_PlayerJoin: {
+            const fb::PlayerJoin* pj = env->message_as_PlayerJoin();
+            if (!pj) break;
+            if (auto it = m_remote_peers.find(from); it != m_remote_peers.end()) {
+                it->second.player_id = pj->player_id();
+                auto& dr = world->GetComponent<Ecs::DeadReckoningComponent>(
+                    it->second.ghost_ship);
+                dr.net_entity_id = pj->player_id();
+                std::cout << "[Game] PlayerJoin: remote player_id = " << pj->player_id() << '\n';
+            }
+        }
+        break;
+
+        case fb::Message_PlayerLeft: {
+            if (auto it = m_remote_peers.find(from); it != m_remote_peers.end()) {
+                world->DestroyEntity(it->second.ghost_ship);
+                m_remote_peers.erase(it);
+                std::cout << "[Game] PlayerLeft: removed ghost ship\n";
+            }
+        }
+        break;
+
+        case fb::Message_EntityState: {
+            const fb::EntityState* es = env->message_as_EntityState();
+            if (!es) break;
+            auto it = m_remote_peers.find(from);
+            if (it == m_remote_peers.end()) break;
+
+            if (es->entity_id() == it->second.player_id && it->second.player_id != 0) {
+                if (!es->pos() || !es->rot() || !es->vel()) break;
+                auto& dr = world->GetComponent<Ecs::DeadReckoningComponent>(
+                    it->second.ghost_ship);
+                dr.last_pos  = from_fb(*es->pos());
+                dr.last_rot  = from_fb(*es->rot());
+                dr.last_vel  = from_fb(*es->vel());
+                dr.recv_time = m_game_time;
+            } else {
+                if (!es->pos() || !es->dir()) break;
+                const glm::vec3 spawn_pos = from_fb(*es->pos());
+                const glm::vec3 dir       = from_fb(*es->dir());
+                const float     speed     = es->vel()
+                    ? glm::length(from_fb(*es->vel()))
+                    : 30.f;
+
+                const auto p = world->CreateEntity();
+                const auto rot = glm::quatLookAt(
+                    glm::normalize(dir), glm::vec3(0.f, 1.f, 0.f));
+                world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(
+                    p, spawn_pos, rot, glm::vec3(1.f));
+                world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(
+                    p, m_laser_model);
+                world->AddComponent<Ecs::ColliderComponent, Ecs::CT_COLLIDER>(
+                    p, m_laser_cmesh, true);
+                world->AddComponent<Ecs::ProjectileComponent, Ecs::CT_PROJECTILE>(
+                    p, glm::normalize(dir), speed);
+            }
+        }
+        break;
+
+        case fb::Message_PlayerDeath:
+        break;
+
+        case fb::Message_PlayerRespawn: {
+            const fb::PlayerRespawn* pr = env->message_as_PlayerRespawn();
+            if (!pr || !pr->pos()) break;
+            if (auto it = m_remote_peers.find(from); it != m_remote_peers.end()) {
+                auto& dr = world->GetComponent<Ecs::DeadReckoningComponent>(
+                    it->second.ghost_ship);
+                dr.last_pos  = from_fb(*pr->pos());
+                dr.last_vel  = glm::vec3(0.f);
+                dr.recv_time = m_game_time;
+            }
+        }
+        break;
+
+        default:
+            break;
+        }
+    }
+    peer.m_inbox.clear();
+}
+
+//------------------------------------------------------------------------------
+/**
+*/
+void SpaceGameApp::Run() {
+    int w, h;
+    this->window->GetSize(w, h);
+
+    this->world = new Ecs::World{};
+
+    glm::mat4 projection = glm::perspective(
+        glm::radians(90.0f), float(w) / float(h), 0.01f, 1000.f);
+    Camera* cam = CameraManager::GetCamera(CAMERA_MAIN);
+    cam->projection = projection;
+
+    // ── Load assets ──
+    ModelId models[6] = {
+        LoadModel("assets/space/Asteroid_1.glb"),
+        LoadModel("assets/space/Asteroid_2.glb"),
+        LoadModel("assets/space/Asteroid_3.glb"),
+        LoadModel("assets/space/Asteroid_4.glb"),
+        LoadModel("assets/space/Asteroid_5.glb"),
+        LoadModel("assets/space/Asteroid_6.glb")
+    };
+
+    Physics::ColliderMeshId colliderMeshes[6] = {
+        Physics::LoadColliderMesh("assets/space/Asteroid_1_physics.glb"),
+        Physics::LoadColliderMesh("assets/space/Asteroid_2_physics.glb"),
+        Physics::LoadColliderMesh("assets/space/Asteroid_3_physics.glb"),
+        Physics::LoadColliderMesh("assets/space/Asteroid_4_physics.glb"),
+        Physics::LoadColliderMesh("assets/space/Asteroid_5_physics.glb"),
+        Physics::LoadColliderMesh("assets/space/Asteroid_6_physics.glb")
+    };
+
+    m_laser_model = LoadModel("assets/space/laser.glb");
+    m_laser_cmesh = Physics::LoadColliderMesh("assets/space/laser.glb");
+
+    // ── Asteroids (near) ──
+    std::vector<Ecs::EntityID> asteroids;
+    for (auto i = 0; i < 100; i++) {
+        const auto ri  = static_cast<size_t>(Core::FastRandom() % 6);
+        constexpr auto span = 30.0f;
+        const auto pos  = glm::vec3(
+            Core::RandomFloatNTP() * span,
+            Core::RandomFloatNTP() * span,
+            Core::RandomFloatNTP() * span);
+        const auto axis = glm::normalize(pos);
+        const auto rot  = glm::quat(Core::RandomFloatNTP(), axis);
+        const auto e    = world->CreateEntity();
+        asteroids.push_back(e);
+        world->AddComponent<Ecs::ModelComponent,   Ecs::CT_MODEL>   (e, models[ri]);
+        world->AddComponent<Ecs::ColliderComponent, Ecs::CT_COLLIDER>(e, colliderMeshes[ri], true);
+        world->AddComponent<Ecs::TransformComponent,Ecs::CT_TRANSFORM>(e, pos, rot, glm::vec3(1.f));
+    }
+
+    // ── Asteroids (far) ──
+    for (int i = 0; i < 50; i++) {
+        const auto ri   = static_cast<size_t>(Core::FastRandom() % 6);
+        constexpr auto span = 100.0f;
+        const auto pos  = glm::vec3(
+            Core::RandomFloatNTP() * span,
+            Core::RandomFloatNTP() * span,
+            Core::RandomFloatNTP() * span);
+        const auto axis = glm::normalize(pos);
+        const auto rot  = glm::quat(Core::RandomFloatNTP(), axis);
+        const auto e    = world->CreateEntity();
+        asteroids.push_back(e);
+        world->AddComponent<Ecs::ModelComponent,   Ecs::CT_MODEL>   (e, models[ri]);
+        world->AddComponent<Ecs::ColliderComponent, Ecs::CT_COLLIDER>(e, colliderMeshes[ri], true);
+        world->AddComponent<Ecs::TransformComponent,Ecs::CT_TRANSFORM>(e, pos, rot, glm::vec3(1.f));
+    }
+
+    // ── Waypoints ──
+    std::vector<Ecs::EntityID> waypoints;
+    for (auto i = 0; i < 4; ++i)
+        waypoints.push_back(world->CreateEntity());
+    {
+        const auto zero_rot = glm::quat_cast(glm::identity<glm::mat4>());
+        world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(waypoints[0], glm::vec3(-10.f,0.f,-10.f), zero_rot, glm::vec3(1.f));
+        world->AddComponent<Ecs::WaypointComponent,  Ecs::CT_WAYPOINT> (waypoints[0], waypoints[3], waypoints[1]);
+        world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(waypoints[1], glm::vec3(-10.f,0.f, 10.f), zero_rot, glm::vec3(1.f));
+        world->AddComponent<Ecs::WaypointComponent,  Ecs::CT_WAYPOINT> (waypoints[1], waypoints[0], waypoints[2]);
+        world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(waypoints[2], glm::vec3( 10.f,0.f, 10.f), zero_rot, glm::vec3(1.f));
+        world->AddComponent<Ecs::WaypointComponent,  Ecs::CT_WAYPOINT> (waypoints[2], waypoints[1], waypoints[3]);
+        world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(waypoints[3], glm::vec3( 10.f,0.f,-10.f), zero_rot, glm::vec3(1.f));
+        world->AddComponent<Ecs::WaypointComponent,  Ecs::CT_WAYPOINT> (waypoints[3], waypoints[2], waypoints[0]);
+    }
+
+    // ── Skybox ──
+    std::vector<const char*> skybox(6, "assets/space/bg.png");
+    TextureResourceId skyboxId = TextureResource::LoadCubemap("skybox", skybox, true);
+    RenderDevice::SetSkybox(skyboxId);
+
+    Input::Keyboard* kbd = Input::GetDefaultKeyboard();
+
+    // ── Lights ──
+    constexpr auto numLights = 40;
+    for (auto i = 0; i < numLights; i++) {
         Render::PointLightId lights[numLights];
-        // Setup lights
-        for (int i = 0; i < numLights; i++) {
-            glm::vec3 translation = glm::vec3(
-                Core::RandomFloatNTP() * 20.0f,
-                Core::RandomFloatNTP() * 20.0f,
-                Core::RandomFloatNTP() * 20.0f
-            );
-            glm::vec3 color = glm::vec3(
-                Core::RandomFloat(),
-                Core::RandomFloat(),
-                Core::RandomFloat()
-            );
-            lights[i] = Render::LightServer::CreatePointLight(
-                translation, color, Core::RandomFloat() * 4.0f, 1.0f + (15 + Core::RandomFloat() * 10.0f)
-            );
-        }
-
-        // SpaceShip ship;
-        const auto ship_model = LoadModel("assets/space/spaceship.glb");
-        const auto ship_collider = std::vector{
-            glm::vec3(1.40173, 0.0, -0.225342), // left wing back
-            glm::vec3(1.33578, 0.0, 0.088893), // left wing front
-            glm::vec3(0.227107, -0.200232, -0.588618), // left back engine bottom
-            glm::vec3(0.227107, 0.228809, -0.588618), // left back engine top
-            glm::vec3(0.391073, -0.130853, 1.28339), // left weapon
-            glm::vec3(0.134787, 0.0, 1.68965), // left front
-            glm::vec3(0.134787, 0.250728, 0.647422), // left wind shield
-
-            glm::vec3(-1.40173, 0.0, -0.225342), // right wing back
-            glm::vec3(-1.33578, 0.0, 0.088893), // right wing front
-            glm::vec3(-0.227107, -0.200232, -0.588618), // right back engine bottom
-            glm::vec3(-0.227107, 0.228809, -0.588618), // right back engine top
-            glm::vec3(-0.391073, -0.130853, 1.28339), // right weapon
-            glm::vec3(-0.134787, 0.0, 1.68965), // right front
-            glm::vec3(-0.134787, 0.250728, 0.647422), // right wind shield
-
-            glm::vec3(0.0, 0.525049, -0.392836), // top back
-            glm::vec3(0.0, 0.739624, 0.102582), // top fin
-            glm::vec3(0.0, -0.244758, 0.284825) // bottom
-        };
-
-        auto ship = world->CreateEntity();
-        {
-            world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(ship, glm::vec3(0.0f), glm::quat(glm::radians(glm::vec3(0.0f, 90.0f, 0.0f))), glm::vec3(1.0f));
-            world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(ship, ship_model);
-            world->AddComponent<Ecs::CameraComponent, Ecs::CT_CAMERA>(ship, glm::mat4(1.0f), glm::perspective(glm::radians(90.0f), float(w) / float(h), 0.01f, 1000.f));
-            world->AddComponent<Ecs::MovementComponent, Ecs::CT_MOVEMENT>(ship);
-            world->AddComponent<Ecs::PlayerCharacterComponent, Ecs::CT_PLAYER_CHARACTER>(ship);
-            world->AddComponent<Ecs::CollisionComponent, Ecs::CT_COLLISION>(ship, ship_collider);
-            world->AddComponent<Ecs::ParticleEmitterComponent, Ecs::CT_PARTICLE_EMITTER>(ship, glm::vec3(0.0f, 0.0f, -0.5f), glm::vec4(0.38f, 0.76f, 0.95f, 1.0f));
-            world->AddComponent<Ecs::ProjectileSpawnerComponent, Ecs::CT_PROJECTILE_SPAWNER>(ship, glm::vec3(0.0f, 0.0f, 2.0f), 30.0f, laser_proj_model, laser_proj_cmesh);
-        }
-
-        // std::vector<Ecs::EntityID> ai_ships;
-        // for (auto i = 0; i < 3; ++i){
-        //     const auto ai_ship = world->CreateEntity();
-        //     ai_ships.push_back(ai_ship);
-        //     const auto translation = glm::vec3(
-        //         Core::RandomFloatNTP() * 20.0f,
-        //         Core::RandomFloatNTP() * 20.0f,
-        //         Core::RandomFloatNTP() * 20.0f
-        //     );
-        //     world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(ai_ship, translation, glm::quat(glm::mat4(1.0f)), glm::vec3(1.0f));
-        //     world->AddComponent<Ecs::ModelComponent, Ecs::CT_MODEL>(ai_ship, ship_model);
-        //     world->AddComponent<Ecs::MovementComponent, Ecs::CT_MOVEMENT>(ai_ship);
-        //     world->AddComponent<Ecs::AICharacterComponent, Ecs::CT_AI_CHARACTER>(ai_ship, waypoints.front(), static_cast<BehaviourType>(i));
-        //     world->AddComponent<Ecs::CollisionComponent, Ecs::CT_COLLISION>(ai_ship, ship_collider);
-        //     world->AddComponent<Ecs::ProjectileSpawnerComponent, Ecs::CT_PROJECTILE_SPAWNER>(ai_ship, glm::vec3(0.0f, 0.0f, 2.0f), 30.0f, laser_proj_model, laser_proj_cmesh);
-        //     world->AddComponent<Ecs::ParticleEmitterComponent, Ecs::CT_PARTICLE_EMITTER>(ai_ship, glm::vec3(0.0f, 0.0f, -0.5f), glm::vec4(0.1f, 0.7f, 0.1f, 1.0f));
-        // }
-
-
-        std::clock_t c_start = std::clock();
-        auto dt = 0.01667f;
-
-        world->Start();
-
-        // game loop
-        while (this->window->IsOpen()) {
-            auto timeStart = std::chrono::steady_clock::now();
-            glClear(GL_DEPTH_BUFFER_BIT);
-            glEnable(GL_DEPTH_TEST);
-            glEnable(GL_CULL_FACE);
-            glCullFace(GL_BACK);
-
-            this->window->Update();
-            peer.update();
-            world->BeforeFrame();
-
-            if (kbd->pressed[Input::Key::Code::End]) { ShaderResource::ReloadShaders(); }
-
-            // ship.Update(dt);
-
-            for (auto e : asteroids) {
-                auto& transform_comp = world->GetComponent<Ecs::TransformComponent>(e);
-                const auto& axis = glm::axis(transform_comp.rot);
-                auto angle = glm::angle(transform_comp.rot);
-                angle += 0.05f * dt;
-                transform_comp.rot = glm::rotate(angle, axis);
-                transform_comp.transform = glm::translate(transform_comp.pos) * glm::mat4_cast(transform_comp.rot);
-            }
-
-            world->PhysicsUpdate(dt);
-            world->Update(dt);
-
-            world->BeforeDraw();
-            world->Draw();
-
-            for (auto i = 0; i < 4; ++i) {
-                const auto& tc = world->GetComponent<Ecs::TransformComponent>(waypoints[i]);
-                Debug::DrawBox(tc.pos, tc.rot, 0.25f, glm::vec4(1.0f - 0.33f * i, 0.0f, 0.0f + 0.33f * i, 1.0f));
-            }
-
-            // Execute the entire rendering pipeline
-            RenderDevice::Render(this->window, dt);
-
-            // transfer new frame to window
-            this->window->SwapBuffers();
-
-            auto timeEnd = std::chrono::steady_clock::now();
-            dt = std::min(0.04f, std::chrono::duration<float>(timeEnd - timeStart).count());
-
-            if (kbd->pressed[Input::Key::Code::Escape])
-                this->Exit();
-        }
+        const glm::vec3 pos   = glm::vec3(Core::RandomFloatNTP(),Core::RandomFloatNTP(),Core::RandomFloatNTP()) * 20.f;
+        const auto color = glm::vec3(Core::RandomFloat(), Core::RandomFloat(), Core::RandomFloat());
+        lights[i] = Render::LightServer::CreatePointLight(
+            pos, color, Core::RandomFloat() * 4.f, 1.f + 15.f + Core::RandomFloat() * 10.f);
     }
 
-    //------------------------------------------------------------------------------
-    /**
-    */
-    void SpaceGameApp::Exit() { this->window->Close(); }
+    // ── Local player ship ──
+    const auto ship_model = LoadModel("assets/space/spaceship.glb");
+    const std::vector<glm::vec3> ship_collider = {
+        {1.40173f,0.f,-0.225342f}, {1.33578f,0.f,0.088893f},
+        {0.227107f,-0.200232f,-0.588618f}, {0.227107f,0.228809f,-0.588618f},
+        {0.391073f,-0.130853f,1.28339f},  {0.134787f,0.f,1.68965f},
+        {0.134787f,0.250728f,0.647422f},
+        {-1.40173f,0.f,-0.225342f}, {-1.33578f,0.f,0.088893f},
+        {-0.227107f,-0.200232f,-0.588618f},{-0.227107f,0.228809f,-0.588618f},
+        {-0.391073f,-0.130853f,1.28339f}, {-0.134787f,0.f,1.68965f},
+        {-0.134787f,0.250728f,0.647422f},
+        {0.f,0.525049f,-0.392836f},{0.f,0.739624f,0.102582f},{0.f,-0.244758f,0.284825f}
+    };
 
-    //------------------------------------------------------------------------------
-    /**
-    */
-    void SpaceGameApp::RenderUI() {
-        if (this->window->IsOpen()) {
-            ImGui::Begin("Debug");
-            Core::CVar* r_draw_light_spheres = Core::CVarGet("r_draw_light_spheres");
-            int drawLightSpheres = Core::CVarReadInt(r_draw_light_spheres);
-            if (ImGui::Checkbox("Draw Light Spheres", (bool*)&drawLightSpheres))
-                Core::CVarWriteInt(r_draw_light_spheres, drawLightSpheres);
+    m_ship = world->CreateEntity();
+    world->AddComponent<Ecs::TransformComponent, Ecs::CT_TRANSFORM>(
+        m_ship, glm::vec3(0.f),
+        glm::quat(glm::radians(glm::vec3(0.f,90.f,0.f))), glm::vec3(1.f));
+    world->AddComponent<Ecs::ModelComponent,    Ecs::CT_MODEL>   (m_ship, ship_model);
+    world->AddComponent<Ecs::CameraComponent,   Ecs::CT_CAMERA>  (m_ship,
+        glm::mat4(1.f),
+        glm::perspective(glm::radians(90.f), static_cast<float>(w)/static_cast<float>(h), 0.01f, 1000.f));
+    world->AddComponent<Ecs::MovementComponent, Ecs::CT_MOVEMENT>(m_ship);
+    world->AddComponent<Ecs::PlayerCharacterComponent, Ecs::CT_PLAYER_CHARACTER>(m_ship);
+    world->AddComponent<Ecs::CollisionComponent,       Ecs::CT_COLLISION>(m_ship, ship_collider);
+    world->AddComponent<Ecs::ParticleEmitterComponent, Ecs::CT_PARTICLE_EMITTER>(
+        m_ship, glm::vec3(0.f,0.f,-0.5f), glm::vec4(0.38f,0.76f,0.95f,1.f));
+    world->AddComponent<Ecs::ProjectileSpawnerComponent, Ecs::CT_PROJECTILE_SPAWNER>(
+        m_ship, glm::vec3(0.f,0.f,2.f), 30.f, m_laser_model, m_laser_cmesh);
 
-            Core::CVar* r_draw_light_sphere_id = Core::CVarGet("r_draw_light_sphere_id");
-            int lightSphereId = Core::CVarReadInt(r_draw_light_sphere_id);
-            if (ImGui::InputInt("LightSphereId", (int*)&lightSphereId))
-                Core::CVarWriteInt(r_draw_light_sphere_id, lightSphereId);
+    world->Start();
 
-            ImGui::Separator();
+    auto dt = 0.01667f;
 
-            ImGui::Text("Network");
+    while (this->window->IsOpen()) {
+        auto timeStart = std::chrono::steady_clock::now();
 
-            std::array<int, 4> octets = Core::ip_into_octets(this->ip);
-            if (ImGui::InputInt4("IP Address", &octets[0])) {
-                this->ip = Core::octets_into_ip(octets);
-            }
-            ImGui::SameLine();
-            int p = this->port;
-            if (ImGui::InputInt("Port", &p)) {
-                this->port = p & 0xFFFF;
-            }
-            if (ImGui::Button("Host")) {
-                if (this->m_server_thread.joinable()) {
-                    this->m_server_stop = true;
-                    this->m_server_thread.join();
-                    this->server.deinit();
-                }
-                this->m_server_stop = false;
+        glClear(GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
 
-                if (this->server.init(this->port)) {
-                    std::cout << "[Host] Routing server listening on port " << this->port << '\n';
-                    this->m_server_thread = std::thread([this]() {
-                        while (!this->m_server_stop.load(std::memory_order_relaxed))
-                            this->server.update();
-                    });
-                    if (!this->peer.connect(this->ip, this->port))
-                        std::cout << "[Host] peer.connect() initiation failed\n";
-                } else {
-                    std::cout << "[Host] Failed to start server on port " << this->port << '\n';
-                }
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Connect")) {
-                std::cout << "Connecting to ip " << Core::ip_into_octets(this->ip) << ":" <<this->port << std::endl;
-                this->peer.connect(this->ip, this->port);
-            }
-            ImGui::End();
+        this->window->Update();
 
-            Debug::DispatchDebugTextDrawing();
+        peer.update();
+        m_game_time += dt;
+        ProcessNetEvents();
+
+        world->BeforeFrame();
+
+        if (kbd->pressed[Input::Key::Code::End])
+            ShaderResource::ReloadShaders();
+
+        for (auto e : asteroids) {
+            auto& tc = world->GetComponent<Ecs::TransformComponent>(e);
+            const auto axis  = glm::axis(tc.rot);
+            float angle = glm::angle(tc.rot);
+            angle += 0.05f * dt;
+            tc.rot = glm::rotate(angle, axis);
+            tc.transform = glm::translate(tc.pos) * glm::mat4_cast(tc.rot);
         }
+
+        const glm::vec3 pos_before = world->GetComponent<Ecs::TransformComponent>(m_ship).pos;
+        world->PhysicsUpdate(dt);
+        const glm::vec3 pos_after  = world->GetComponent<Ecs::TransformComponent>(m_ship).pos;
+
+        if (!peer.m_peers.empty() && glm::distance(pos_before, pos_after) > 1.f) {
+            {
+                flatbuffers::FlatBufferBuilder fbb;
+                auto death = fb::CreatePlayerDeath(fbb, m_local_player_id);
+                auto env   = fb::CreateEnvelope(fbb, fb::Message_PlayerDeath, death.Union());
+                fbb.Finish(env);
+                Broadcast(fbb, true);
+            }
+            {
+                flatbuffers::FlatBufferBuilder fbb;
+                const fb::Vec3 pos = to_fb(pos_after);
+                auto respawn = fb::CreatePlayerRespawn(fbb, m_local_player_id, &pos);
+                auto env     = fb::CreateEnvelope(fbb, fb::Message_PlayerRespawn, respawn.Union());
+                fbb.Finish(env);
+                Broadcast(fbb, true);
+            }
+        }
+
+        world->Update(dt);
+
+        if (kbd->pressed[Input::Key::Code::Space] && !peer.m_peers.empty()) {
+            const auto& t  = world->GetComponent<Ecs::TransformComponent>(m_ship);
+            const auto& ps = world->GetComponent<Ecs::ProjectileSpawnerComponent>(m_ship);
+            const glm::vec3 spawn_pos = glm::vec3(t.transform * glm::vec4(ps.offset, 1.f));
+            const glm::vec3 dir       = glm::normalize(
+                glm::vec3(t.transform * glm::vec4(0.f, 0.f, 1.f, 0.f)));
+            const glm::vec3 vel       = dir * ps.speed;
+
+            flatbuffers::FlatBufferBuilder fbb;
+            const fb::Vec3 p  = to_fb(spawn_pos);
+            const fb::Vec3 d  = to_fb(dir);
+            const fb::Vec3 v  = to_fb(vel);
+            const fb::Quat r  = {};
+            const uint32_t id = (m_local_player_id << 8) | m_proj_counter++;
+            auto es  = fb::CreateEntityState(fbb, id, &p, &r, &v, &d, 0);
+            auto env = fb::CreateEnvelope(fbb, fb::Message_EntityState, es.Union());
+            fbb.Finish(env);
+            Broadcast(fbb, true);
+        }
+
+        m_net_tick_accum += dt;
+        if (m_net_tick_accum >= NET_TICK && !peer.m_peers.empty()) {
+            m_net_tick_accum -= NET_TICK;
+
+            const auto& t = world->GetComponent<Ecs::TransformComponent>(m_ship);
+            const auto& m = world->GetComponent<Ecs::MovementComponent>(m_ship);
+
+            flatbuffers::FlatBufferBuilder fbb;
+            const fb::Vec3 pos = to_fb(t.pos);
+            const fb::Quat rot = to_fb(t.rot);
+            const fb::Vec3 vel = to_fb(m.linearVelocity);
+            const glm::vec3 fwd = t.transform * glm::vec4(0.f, 0.f, 1.f, 0.f);
+            const fb::Vec3 dir  = to_fb(fwd);
+            auto es  = fb::CreateEntityState(fbb, m_local_player_id, &pos, &rot, &vel, &dir, 0);
+            auto env = fb::CreateEnvelope(fbb, fb::Message_EntityState, es.Union());
+            fbb.Finish(env);
+            Broadcast(fbb, false);
+        }
+
+        world->BeforeDraw();
+        world->Draw();
+
+        for (auto i = 0; i < 4; ++i) {
+            const auto& tc = world->GetComponent<Ecs::TransformComponent>(waypoints[i]);
+            Debug::DrawBox(tc.pos, tc.rot, 0.25f,
+                glm::vec4(1.f - 0.33f*i, 0.f, 0.33f*i, 1.f));
+        }
+
+        RenderDevice::Render(this->window, dt);
+        this->window->SwapBuffers();
+
+        auto timeEnd = std::chrono::steady_clock::now();
+        dt = std::min(0.04f, std::chrono::duration<float>(timeEnd - timeStart).count());
+
+        if (kbd->pressed[Input::Key::Code::Escape])
+            this->Exit();
     }
+}
+
+//------------------------------------------------------------------------------
+/**
+*/
+void SpaceGameApp::Exit() { this->window->Close(); }
+
+//------------------------------------------------------------------------------
+/**
+*/
+void SpaceGameApp::RenderUI() {
+    if (this->window->IsOpen()) {
+        ImGui::Begin("Debug");
+
+        Core::CVar* r_draw_light_spheres = Core::CVarGet("r_draw_light_spheres");
+        int drawLightSpheres = Core::CVarReadInt(r_draw_light_spheres);
+        if (ImGui::Checkbox("Draw Light Spheres", (bool*)&drawLightSpheres))
+            Core::CVarWriteInt(r_draw_light_spheres, drawLightSpheres);
+
+        Core::CVar* r_draw_light_sphere_id = Core::CVarGet("r_draw_light_sphere_id");
+        int lightSphereId = Core::CVarReadInt(r_draw_light_sphere_id);
+        if (ImGui::InputInt("LightSphereId", (int*)&lightSphereId))
+            Core::CVarWriteInt(r_draw_light_sphere_id, lightSphereId);
+
+        ImGui::Separator();
+        ImGui::Text("Network  (player_id: %u)", m_local_player_id);
+        ImGui::Text("P2P peers connected: %d", (int)peer.m_peers.size());
+
+        std::array<int, 4> octets = Core::ip_into_octets(this->ip);
+        if (ImGui::InputInt4("IP Address", &octets[0]))
+            this->ip = Core::octets_into_ip(octets);
+        ImGui::SameLine();
+        int p = this->port;
+        if (ImGui::InputInt("Port", &p))
+            this->port = static_cast<uint16_t>(p & 0xFFFF);
+
+        if (ImGui::Button("Host")) {
+            if (this->m_server_thread.joinable()) {
+                this->m_server_stop = true;
+                this->m_server_thread.join();
+                this->server.deinit();
+            }
+            this->m_server_stop = false;
+
+            if (this->server.init(this->port)) {
+                std::cout << "[Host] Routing server listening on port " << this->port << '\n';
+                this->m_server_thread = std::thread([this]() {
+                    while (!this->m_server_stop.load(std::memory_order_relaxed))
+                        this->server.update();
+                });
+                if (!this->peer.connect(this->ip, this->port))
+                    std::cout << "[Host] peer.connect() initiation failed\n";
+            } else {
+                std::cout << "[Host] Failed to start server on port " << this->port << '\n';
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Connect")) {
+            std::cout << "[Connect] Connecting to "
+                      << Core::ip_into_octets(this->ip) << ':' << this->port << '\n';
+            this->peer.connect(this->ip, this->port);
+        }
+
+        ImGui::End();
+        Debug::DispatchDebugTextDrawing();
+    }
+}
+
 } // namespace Game

@@ -177,13 +177,29 @@ namespace Ecs {
         ProjectileComponent& operator=(ProjectileComponent&&) = default;
     };
 
+    struct DeadReckoningComponent {
+        glm::vec3 last_pos{};
+        glm::vec3 last_vel{};
+        glm::quat last_rot{};
+        float     recv_time{};
+        uint32_t  net_entity_id{};
+
+        DeadReckoningComponent() = default;
+        DeadReckoningComponent(uint32_t id) : net_entity_id(id) {}
+        DeadReckoningComponent(const DeadReckoningComponent&) = default;
+        DeadReckoningComponent(DeadReckoningComponent&&) = default;
+        DeadReckoningComponent& operator=(const DeadReckoningComponent&) = default;
+        DeadReckoningComponent& operator=(DeadReckoningComponent&&) = default;
+    };
+
     template <typename ...Components>
     struct ComponentGroup {};
 
     using AllComponents = ComponentGroup<TransformComponent, CameraComponent, ModelComponent, ColliderComponent,
                                          MovementComponent, PlayerCharacterComponent, AICharacterComponent,
                                          CollisionComponent, WaypointComponent, ParticleEmitterComponent,
-                                         ProjectileSpawnerComponent, ProjectileComponent>;
+                                         ProjectileSpawnerComponent, ProjectileComponent,
+                                         DeadReckoningComponent>;
 
     class ComponentsManager {
     public:

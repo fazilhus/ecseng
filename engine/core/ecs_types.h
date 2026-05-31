@@ -24,6 +24,7 @@ namespace Ecs {
         CT_PARTICLE_EMITTER = 1 << 9,
         CT_PROJECTILE_SPAWNER = 1 << 10,
         CT_PROJECTILE = 1 << 11,
+        CT_DEAD_RECKONING = 1 << 12,
         CT_MAX = 1 << 31,
     };
 

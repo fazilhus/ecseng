@@ -8,6 +8,7 @@
 
 #include "protocol.h"
 
+
 inline std::ostream& operator<<(std::ostream& os, std::array<int, 4> ip_octets) {
     os << ip_octets[0] << '.' << ip_octets[1] << '.' << ip_octets[2] << '.' << ip_octets[3];
     return os;
@@ -15,8 +16,10 @@ inline std::ostream& operator<<(std::ostream& os, std::array<int, 4> ip_octets) 
 
 namespace Core {
 
-    // constexpr uint32_t g_routing_server_address = 0x7f000001;
-    // constexpr uint16_t g_routing_server_port = 6969;
+    struct incoming_msg {
+        ENetPeer*            from;
+        std::vector<uint8_t> data;
+    };
 
     class server {
     public:
@@ -50,7 +53,12 @@ namespace Core {
         bool m_initialized;
         ENetHost* m_host;
         ENetPeer* m_server_peer;
+
         std::vector<ENetPeer*> m_peers;
+
+        std::vector<incoming_msg> m_inbox;
+        std::vector<ENetPeer*>   m_connected_peers;
+        std::vector<ENetPeer*>   m_disconnected_peers;
     };
 
     std::array<int, 4> ip_into_octets(uint32_t ip);

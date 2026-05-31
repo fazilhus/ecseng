@@ -83,11 +83,18 @@ namespace Ecs {
         virtual void Update(const std::vector<EntityID>& entities, float dt) override;
     };
 
+    struct DeadReckoningSystem final : public BaseSystemInt<CT_TRANSFORM, CT_DEAD_RECKONING> {
+        DeadReckoningSystem(World* w)
+            : BaseSystemInt(w) {}
+        virtual void Update(const std::vector<EntityID>& entities, float dt) override;
+        float game_time = 0.f;
+    };
+
     template <typename ...Systems>
     struct SystemGroup {};
 
     using AllSystems = SystemGroup<PhysicsBodySystem, DrawableSystem, PlayerControllerSystem, AIControllerSystem,
-                                   ParticleSystem, ProjectileSystem>;
+                                   ParticleSystem, ProjectileSystem, DeadReckoningSystem>;
 
     class SystemsManager {
     public:

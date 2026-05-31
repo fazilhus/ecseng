@@ -48,7 +48,6 @@ namespace Core {
             std::cout << "[Routing Server] Deinitialized\n";
             enet_host_destroy(m_host);
         }
-
         enet_deinitialize();
         m_initialized = false;
     }
@@ -77,7 +76,6 @@ namespace Core {
                         fbb.GetBufferPointer(), fbb.GetSize(), ENET_PACKET_FLAG_RELIABLE);
                     if (enet_peer_send(e.peer, 0, pkt) != 0) enet_packet_destroy(pkt);
                 }
-
                 // Broadcast NewPeer to all existing peers
                 {
                     flatbuffers::FlatBufferBuilder fbb;
@@ -91,7 +89,6 @@ namespace Core {
                         if (enet_peer_send(p, 0, pkt) != 0) enet_packet_destroy(pkt);
                     }
                 }
-
                 m_peers.emplace_back(e.peer);
                 enet_host_flush(m_host);
                 std::cout << "[Routing Server] Peer connected from " << ip << '\n';
@@ -102,10 +99,9 @@ namespace Core {
                 std::cout << "[Routing Server] Peer disconnected: " << ip << '\n';
             }
             break;
-            case ENET_EVENT_TYPE_RECEIVE: {
+            case ENET_EVENT_TYPE_RECEIVE:
                 enet_packet_destroy(e.packet);
-            }
-            break;
+                break;
             default:
                 break;
             }
@@ -138,7 +134,6 @@ namespace Core {
             return;
         if (m_host != nullptr)
             enet_host_destroy(m_host);
-
         enet_deinitialize();
         m_initialized = false;
     }
@@ -148,7 +143,6 @@ namespace Core {
             std::cerr << "[Peer] connect() called before init()\n";
             return false;
         }
-
         ENetAddress server_addr;
         server_addr.host = ip;
         server_addr.port = port;
@@ -162,17 +156,16 @@ namespace Core {
             std::cerr << "[Peer] enet_host_connect returned nullptr (no peer slots?)\n";
             return false;
         }
+        // Non-blocking: flush the SYN; CONNECT arrives in next update().
         enet_host_flush(m_host);
         return true;
     }
 
     void peer::disconnect() {
-        if (m_server_peer != nullptr) {
+        if (m_server_peer != nullptr)
             enet_peer_disconnect_now(m_server_peer, 0);
-        }
-        for (const auto p : m_peers) {
+        for (const auto p : m_peers)
             enet_peer_disconnect_now(p, 0);
-        }
         m_peers.clear();
         m_server_peer = nullptr;
     }
@@ -192,6 +185,7 @@ namespace Core {
                 } else {
                     std::cout << "[Peer] Connected to P2P peer at " << ip << '\n';
                     m_peers.emplace_back(e.peer);
+                    m_connected_peers.emplace_back(e.peer);   // notify game layer
                 }
             }
             break;
@@ -202,6 +196,7 @@ namespace Core {
                 } else if (auto it = std::ranges::find(m_peers, e.peer);
                            it != m_peers.end()) {
                     m_peers.erase(it);
+                    m_disconnected_peers.emplace_back(e.peer); // notify game layer
                 }
             }
             break;
@@ -213,53 +208,40 @@ namespace Core {
                     break;
                 }
                 const fb::Envelope* envelope = fb::GetEnvelope(e.packet->data);
-                switch (envelope->message_type()) {
+                const fb::Message msg_type   = envelope->message_type();
 
-                case fb::Message_PeerList: {
+                if (msg_type == fb::Message_PeerList) {
                     const fb::PeerList* peer_list = envelope->message_as_PeerList();
-                    if (!peer_list || !peer_list->peers()) break;
-                    for (const fb::PeerAddress* pa : *peer_list->peers()) {
-                        ENetAddress addr{ pa->host(), pa->port() };
+                    if (peer_list && peer_list->peers()) {
+                        for (const fb::PeerAddress* pa : *peer_list->peers()) {
+                            ENetAddress addr{ pa->host(), pa->port() };
+                            char peer_ip[40];
+                            enet_address_get_host_ip(&addr, peer_ip, 40);
+                            std::cout << "[Peer] Connecting to listed peer "
+                                      << peer_ip << ':' << pa->port() << '\n';
+                            if (!enet_host_connect(m_host, &addr, 2, 0))
+                                std::cerr << "[Peer] No peer slots for " << peer_ip << '\n';
+                        }
+                        enet_host_flush(m_host);
+                    }
+                } else if (msg_type == fb::Message_NewPeer) {
+                    const fb::NewPeer* new_peer = envelope->message_as_NewPeer();
+                    if (new_peer && new_peer->address()) {
+                        ENetAddress addr{ new_peer->address()->host(), new_peer->address()->port() };
                         char peer_ip[40];
                         enet_address_get_host_ip(&addr, peer_ip, 40);
-                        std::cout << "[Peer] Connecting to listed peer " << peer_ip << ':' << pa->port() << '\n';
+                        std::cout << "[Peer] New peer introduced: "
+                                  << peer_ip << ':' << new_peer->address()->port() << '\n';
                         if (!enet_host_connect(m_host, &addr, 2, 0))
                             std::cerr << "[Peer] No peer slots for " << peer_ip << '\n';
+                        enet_host_flush(m_host);
                     }
-                    enet_host_flush(m_host);
-                }
-                break;
-
-                case fb::Message_NewPeer: {
-                    const fb::NewPeer* new_peer = envelope->message_as_NewPeer();
-                    if (!new_peer || !new_peer->address()) break;
-                    ENetAddress addr{ new_peer->address()->host(), new_peer->address()->port() };
-                    char peer_ip[40];
-                    enet_address_get_host_ip(&addr, peer_ip, 40);
-                    std::cout << "[Peer] New peer introduced: " << peer_ip << ':' << new_peer->address()->port() << '\n';
-                    if (!enet_host_connect(m_host, &addr, 2, 0))
-                        std::cerr << "[Peer] No peer slots for " << peer_ip << '\n';
-                    enet_host_flush(m_host);
-                }
-                break;
-
-                case fb::Message_Ping: {
-                    std::cout << "[Peer] Ping from " << ip << '\n';
-                    flatbuffers::FlatBufferBuilder fbb;
-                    auto pong = fb::CreatePong(fbb);
-                    auto env_out = fb::CreateEnvelope(fbb, fb::Message_Pong, pong.Union());
-                    fbb.Finish(env_out);
-                    ENetPacket* pkt = enet_packet_create(
-                        fbb.GetBufferPointer(), fbb.GetSize(), ENET_PACKET_FLAG_RELIABLE);
-                    if (enet_peer_send(e.peer, 0, pkt) != 0) enet_packet_destroy(pkt);
-                }
-                break;
-
-                case fb::Message_Pong:
-                    std::cout << "[Peer] Pong from " << ip << '\n';
-                break;
-
-                default: break;
+                } else {
+                    incoming_msg msg;
+                    msg.from = e.peer;
+                    msg.data.assign(e.packet->data,
+                                    e.packet->data + e.packet->dataLength);
+                    m_inbox.emplace_back(std::move(msg));
                 }
                 enet_packet_destroy(e.packet);
             }

@@ -1,6 +1,5 @@
 #--------------------------------------------------------------------------
-# net library — standalone networking (no render/glew/glfw dependencies)
-# Only depends on enet and flatbuffers-generated protocol.
+# net
 #--------------------------------------------------------------------------
 
 flat_compile(protocol.fbs)

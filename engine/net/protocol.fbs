@@ -58,9 +58,6 @@ table NewPeer {
     address: PeerAddress;
 }
 
-table Ping {}
-table Pong {}
-
 union Message {
     PlayerJoin,
     PlayerLeft,
@@ -70,8 +67,6 @@ union Message {
     BatchState,
     PeerList,
     NewPeer,
-    Ping,
-    Pong,
 }
 
 table Envelope {

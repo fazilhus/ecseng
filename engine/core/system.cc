@@ -388,6 +388,18 @@ namespace Ecs {
     }
 
 
+    void DeadReckoningSystem::Update(const std::vector<EntityID>& entities, float dt) {
+        game_time += dt;
+        for (auto e : entities) {
+            auto& t_comp = world->GetComponent<TransformComponent>(e);
+            const auto& dr = world->GetComponent<DeadReckoningComponent>(e);
+            const float elapsed = game_time - dr.recv_time;
+            t_comp.pos = dr.last_pos + dr.last_vel * elapsed;
+            t_comp.rot = dr.last_rot;
+            t_comp.transform = glm::translate(t_comp.pos) * glm::mat4_cast(t_comp.rot) * glm::scale(t_comp.scale);
+        }
+    }
+
     void SystemsManager::init(World* w) {
         RegisterSystems(w, AllSystems{});
 
