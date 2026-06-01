@@ -42,8 +42,8 @@ namespace Game {
         Display::Window* window = nullptr;
         Ecs::World* world  = nullptr;
 
-        Core::peer peer;
-        Core::server server;
+        Net::peer peer;
+        Net::server server;
         std::thread m_server_thread;
         std::atomic<bool> m_server_stop{false};
         uint32_t ip;

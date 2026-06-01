@@ -8,7 +8,7 @@
 //------------------------------------------------------------------------------
 #pragma once
 
-namespace Core {
+namespace Net {
 
 #ifdef _WIN32
 #include <cstdio>

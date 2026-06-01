@@ -7,6 +7,8 @@
 #include <enet/enet.h>
 
 #include "protocol.h"
+#include "fwd.hpp"
+#include "detail/type_quat.hpp"
 
 
 inline std::ostream& operator<<(std::ostream& os, std::array<int, 4> ip_octets) {
@@ -14,12 +16,22 @@ inline std::ostream& operator<<(std::ostream& os, std::array<int, 4> ip_octets) 
     return os;
 }
 
-namespace Core {
+namespace Net {
+
+    std::string get_local_ip();
+    void lan_scan_thread(std::atomic<uint32_t>* scan_result, std::atomic<bool>* scanning);
 
     struct incoming_msg {
         ENetPeer* from;
         std::vector<uint8_t> data;
     };
+
+    constexpr float TICKRATE = 1.f / 64.f;
+
+    inline fb::Vec3 to_fb(const glm::vec3& v) { return { v.x, v.y, v.z }; }
+    inline fb::Quat to_fb(const glm::quat& q) { return { q.x, q.y, q.z, q.w }; }
+    inline glm::vec3 from_fb(const fb::Vec3& v) { return { v.x(), v.y(), v.z() }; }
+    inline glm::quat from_fb(const fb::Quat& q) { return { q.w(), q.x(), q.y(), q.z() }; }
 
     class server {
     public:

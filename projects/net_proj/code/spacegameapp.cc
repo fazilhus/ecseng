@@ -19,17 +19,10 @@
 #include "render/input/inputserver.h"
 #include "core/cvar.h"
 #include "render/physics.h"
-#include <chrono>
 #include <iostream>
 #include "gtx/quaternion.hpp"
 #include <enet/enet.h>
 #include "net/firewall.h"
-
-#ifdef _WIN32
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#pragma comment(lib, "ws2_32")
-#endif
 
 using namespace Display;
 using namespace Render;
@@ -40,107 +33,26 @@ namespace Game {
 // Helpers
 //------------------------------------------------------------------------------
 
-namespace {
-    constexpr float NET_TICK = 1.f / 20.f;
 
-    inline fb::Vec3 to_fb(const glm::vec3& v) { return { v.x, v.y, v.z }; }
-    inline fb::Quat to_fb(const glm::quat& q) { return { q.x, q.y, q.z, q.w }; }
-    inline glm::vec3 from_fb(const fb::Vec3& v) { return { v.x(), v.y(), v.z() }; }
-    inline glm::quat from_fb(const fb::Quat& q) { return { q.w(), q.x(), q.y(), q.z() }; }
-
-#ifdef _WIN32
-    std::string get_local_ip()
-    {
-        SOCKET s = socket(AF_INET, SOCK_DGRAM, 0);
-        if (s == INVALID_SOCKET)
-            return "0.0.0.0";
-        sockaddr_in dst{};
-        dst.sin_family = AF_INET;
-        dst.sin_port   = htons(53);
-        inet_pton(AF_INET, "8.8.8.8", &dst.sin_addr);
-        connect(s, (sockaddr*)&dst, sizeof(dst)); // no packet actually sent
-        sockaddr_in local{};
-        int len = sizeof(local);
-        if (getsockname(s, (sockaddr*)&local, &len) != 0) {
-            closesocket(s);
-            return "0.0.0.0";
-        }
-        closesocket(s);
-        char buf[INET_ADDRSTRLEN];
-        inet_ntop(AF_INET, &local.sin_addr, buf, sizeof(buf));
-        return buf;
-    }
-#else
-    std::string get_local_ip() { return "0.0.0.0"; }
-#endif
-
-    void lan_scan_thread(std::atomic<uint32_t>* scan_result, std::atomic<bool>* scanning)
-    {
-#ifdef _WIN32
-        // Bind to a fixed port to receive broadcast beacons
-        SOCKET s = socket(AF_INET, SOCK_DGRAM, 0);
-        if (s == INVALID_SOCKET) { *scanning = false; return; }
-        BOOL yes = TRUE;
-        setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (char*)&yes, sizeof(yes));
-
-        sockaddr_in local{};
-        local.sin_family = AF_INET;
-        local.sin_port   = htons(6970);
-        local.sin_addr.s_addr = INADDR_ANY;
-        if (bind(s, (sockaddr*)&local, sizeof(local)) != 0) {
-            closesocket(s);
-            *scanning = false;
-            return;
-        }
-
-        // Set non-blocking so we can poll with timeout
-        u_long nb = 1;
-        ioctlsocket(s, FIONBIO, &nb);
-
-        auto t0 = std::chrono::steady_clock::now();
-        char buf[64];
-        sockaddr_in from{};
-        int fl = sizeof(from);
-
-        while (std::chrono::duration<float>(std::chrono::steady_clock::now() - t0).count() < 2.0f) {
-            int n = recvfrom(s, buf, sizeof(buf), 0, (sockaddr*)&from, &fl);
-            if (n == 4 && std::memcmp(buf, "ECS1", 4) == 0) {
-                // Found a routing server beacon — store the source IP
-                uint32_t expected = 0;
-                if (scan_result->compare_exchange_strong(expected, from.sin_addr.s_addr)) {
-                    char buf2[INET_ADDRSTRLEN];
-                    inet_ntop(AF_INET, &from.sin_addr, buf2, sizeof(buf2));
-                    std::cout << "[Scan] Found routing server at "
-                              << buf2 << ":6969\n";
-                }
-                break;
-            }
-            fl = sizeof(from); // reset addr length
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        }
-        closesocket(s);
-#endif
-        *scanning = false;
-    }
-} // anonymous
 
 //------------------------------------------------------------------------------
 /**
 */
 SpaceGameApp::SpaceGameApp()
     : window(nullptr), world(nullptr),
-      ip(Core::octets_into_ip({127, 0, 0, 1})), port(6969)
+      ip(Net::octets_into_ip({127, 0, 0, 1})), port(6969)
 {
-    Core::ensure_udp_firewall_rule("ECS SpaceGame");
+    Net::ensure_udp_firewall_rule("ECS SpaceGame");
 
     std::mt19937 rng{ std::random_device{}() };
     m_local_player_id = std::uniform_int_distribution(1u, UINT32_MAX)(rng);
     std::cout << "[Net] Local player_id = " << m_local_player_id << '\n';
 
+    if (enet_initialize() != 0) return;
     this->peer.init();
 
     // Detect local LAN IP for display in the Host panel
-    m_local_ip_str = get_local_ip();
+    m_local_ip_str = Net::get_local_ip();
     std::cout << "[Net] Local LAN IP: " << m_local_ip_str << '\n';
 }
 
@@ -154,6 +66,7 @@ SpaceGameApp::~SpaceGameApp() {
         this->m_server_thread.join();
     }
     this->server.deinit();
+    enet_deinitialize();
 }
 
 //------------------------------------------------------------------------------
@@ -265,16 +178,16 @@ void SpaceGameApp::ProcessNetEvents() {
                 if (!es->pos() || !es->rot() || !es->vel()) break;
                 auto& dr = world->GetComponent<Ecs::DeadReckoningComponent>(
                     it->second.ghost_ship);
-                dr.last_pos  = from_fb(*es->pos());
-                dr.last_rot  = from_fb(*es->rot());
-                dr.last_vel  = from_fb(*es->vel());
+                dr.last_pos  = Net::from_fb(*es->pos());
+                dr.last_rot  = Net::from_fb(*es->rot());
+                dr.last_vel  = Net::from_fb(*es->vel());
                 dr.recv_time = m_game_time;
             } else {
                 if (!es->pos() || !es->dir()) break;
-                const glm::vec3 spawn_pos = from_fb(*es->pos());
-                const glm::vec3 dir       = from_fb(*es->dir());
+                const glm::vec3 spawn_pos = Net::from_fb(*es->pos());
+                const glm::vec3 dir       = Net::from_fb(*es->dir());
                 const float     speed     = es->vel()
-                    ? glm::length(from_fb(*es->vel()))
+                    ? glm::length(Net::from_fb(*es->vel()))
                     : 30.f;
 
                 const auto p = world->CreateEntity();
@@ -302,7 +215,7 @@ void SpaceGameApp::ProcessNetEvents() {
             if (auto it = m_remote_peers.find(from); it != m_remote_peers.end()) {
                 auto& dr = world->GetComponent<Ecs::DeadReckoningComponent>(
                     it->second.ghost_ship);
-                dr.last_pos  = from_fb(*pr->pos());
+                dr.last_pos  = Net::from_fb(*pr->pos());
                 dr.last_vel  = glm::vec3(0.f);
                 dr.recv_time = m_game_time;
             }
@@ -326,7 +239,7 @@ void SpaceGameApp::Run() {
     this->world = new Ecs::World{};
 
     glm::mat4 projection = glm::perspective(
-        glm::radians(90.0f), float(w) / float(h), 0.01f, 1000.f);
+        glm::radians(90.0f), static_cast<float>(w) / static_cast<float>(h), 0.01f, 1000.f);
     Camera* cam = CameraManager::GetCamera(CAMERA_MAIN);
     cam->projection = projection;
 
@@ -496,7 +409,7 @@ void SpaceGameApp::Run() {
             }
             {
                 flatbuffers::FlatBufferBuilder fbb;
-                const fb::Vec3 pos = to_fb(pos_after);
+                const fb::Vec3 pos = Net::to_fb(pos_after);
                 auto respawn = fb::CreatePlayerRespawn(fbb, m_local_player_id, &pos);
                 auto env     = fb::CreateEnvelope(fbb, fb::Message_PlayerRespawn, respawn.Union());
                 fbb.Finish(env);
@@ -515,9 +428,9 @@ void SpaceGameApp::Run() {
             const glm::vec3 vel       = dir * ps.speed;
 
             flatbuffers::FlatBufferBuilder fbb;
-            const fb::Vec3 p  = to_fb(spawn_pos);
-            const fb::Vec3 d  = to_fb(dir);
-            const fb::Vec3 v  = to_fb(vel);
+            const fb::Vec3 p  = Net::to_fb(spawn_pos);
+            const fb::Vec3 d  = Net::to_fb(dir);
+            const fb::Vec3 v  = Net::to_fb(vel);
             const fb::Quat r  = {};
             const uint32_t id = (m_local_player_id << 8) | m_proj_counter++;
             auto es  = fb::CreateEntityState(fbb, id, &p, &r, &v, &d, 0);
@@ -527,18 +440,18 @@ void SpaceGameApp::Run() {
         }
 
         m_net_tick_accum += dt;
-        if (m_net_tick_accum >= NET_TICK && !peer.m_peers.empty()) {
-            m_net_tick_accum -= NET_TICK;
+        if (m_net_tick_accum >= Net::TICKRATE && !peer.m_peers.empty()) {
+            m_net_tick_accum -= Net::TICKRATE;
 
             const auto& t = world->GetComponent<Ecs::TransformComponent>(m_ship);
             const auto& m = world->GetComponent<Ecs::MovementComponent>(m_ship);
 
             flatbuffers::FlatBufferBuilder fbb;
-            const fb::Vec3 pos = to_fb(t.pos);
-            const fb::Quat rot = to_fb(t.rot);
-            const fb::Vec3 vel = to_fb(m.linearVelocity);
+            const fb::Vec3 pos = Net::to_fb(t.pos);
+            const fb::Quat rot = Net::to_fb(t.rot);
+            const fb::Vec3 vel = Net::to_fb(m.linearVelocity);
             const glm::vec3 fwd = t.transform * glm::vec4(0.f, 0.f, 1.f, 0.f);
-            const fb::Vec3 dir  = to_fb(fwd);
+            const fb::Vec3 dir  = Net::to_fb(fwd);
             auto es  = fb::CreateEntityState(fbb, m_local_player_id, &pos, &rot, &vel, &dir, 0);
             auto env = fb::CreateEnvelope(fbb, fb::Message_EntityState, es.Union());
             fbb.Finish(env);
@@ -597,9 +510,9 @@ void SpaceGameApp::RenderUI() {
         ImGui::Text("My LAN IP: %s  (share with other players)", m_local_ip_str.c_str());
         ImGui::Text("P2P peers connected: %d", (int)peer.m_peers.size());
 
-        std::array<int, 4> octets = Core::ip_into_octets(this->ip);
+        std::array<int, 4> octets = Net::ip_into_octets(this->ip);
         if (ImGui::InputInt4("IP Address", &octets[0]))
-            this->ip = Core::octets_into_ip(octets);
+            this->ip = Net::octets_into_ip(octets);
         ImGui::SameLine();
         int p = this->port;
         if (ImGui::InputInt("Port", &p))
@@ -614,7 +527,7 @@ void SpaceGameApp::RenderUI() {
                         while (!this->m_server_stop.load(std::memory_order_relaxed))
                             this->server.update();
                     });
-                    if (!this->peer.connect(Core::octets_into_ip({127, 0, 0, 1}), this->port))
+                    if (!this->peer.connect(Net::octets_into_ip({127, 0, 0, 1}), this->port))
                         std::cout << "[Host] peer.connect() initiation failed\n";
                 } else {
                     std::cout << "[Host] Failed to start server on port " << this->port << '\n';
@@ -623,7 +536,7 @@ void SpaceGameApp::RenderUI() {
             ImGui::SameLine();
             if (ImGui::Button("Connect")) {
                 std::cout << "[Peer] Connecting to "
-                          << Core::ip_into_octets(this->ip) << ':' << this->port << '\n';
+                          << Net::ip_into_octets(this->ip) << ':' << this->port << '\n';
                 this->peer.connect(this->ip, this->port);
             }
             ImGui::SameLine();
@@ -631,7 +544,7 @@ void SpaceGameApp::RenderUI() {
                 m_scanning = true;
                 m_ip_found = false;
                 std::cout << "[Scan] Scanning for routing servers on LAN...\n";
-                std::thread(lan_scan_thread, &m_scan_ip, &m_scanning).detach();
+                std::thread(Net::lan_scan_thread, &m_scan_ip, &m_scanning).detach();
             }
             if (m_scanning.load()) {
                 ImGui::SameLine();
@@ -650,9 +563,10 @@ void SpaceGameApp::RenderUI() {
                     this->m_server_thread.join();
                 }
                 this->m_server_stop = false;
-                for (auto it : m_remote_peers) {
-                    if (it.first == nullptr) continue;
-                    world->DestroyEntity(it.second.ghost_ship);
+                this->server.deinit();
+                for (auto [fst, snd] : m_remote_peers) {
+                    if (fst == nullptr) continue;
+                    world->DestroyEntity(snd.ghost_ship);
                     std::cout << "[Game] PlayerLeft: removed ghost ship\n";
                 }
                 this->peer.disconnect();

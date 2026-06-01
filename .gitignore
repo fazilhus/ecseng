@@ -3,6 +3,7 @@
 bin/*.exe
 bin/spacegame
 bin/*.pdb
+bin/assets/*
 .idea
 *.ilk
 .clang-format
