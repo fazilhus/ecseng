@@ -23,6 +23,13 @@
 #include <iostream>
 #include "gtx/quaternion.hpp"
 #include <enet/enet.h>
+#include "net/firewall.h"
+
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32")
+#endif
 
 using namespace Display;
 using namespace Render;
@@ -40,6 +47,81 @@ namespace {
     inline fb::Quat to_fb(const glm::quat& q) { return { q.x, q.y, q.z, q.w }; }
     inline glm::vec3 from_fb(const fb::Vec3& v) { return { v.x(), v.y(), v.z() }; }
     inline glm::quat from_fb(const fb::Quat& q) { return { q.w(), q.x(), q.y(), q.z() }; }
+
+#ifdef _WIN32
+    std::string get_local_ip()
+    {
+        SOCKET s = socket(AF_INET, SOCK_DGRAM, 0);
+        if (s == INVALID_SOCKET)
+            return "0.0.0.0";
+        sockaddr_in dst{};
+        dst.sin_family = AF_INET;
+        dst.sin_port   = htons(53);
+        inet_pton(AF_INET, "8.8.8.8", &dst.sin_addr);
+        connect(s, (sockaddr*)&dst, sizeof(dst)); // no packet actually sent
+        sockaddr_in local{};
+        int len = sizeof(local);
+        if (getsockname(s, (sockaddr*)&local, &len) != 0) {
+            closesocket(s);
+            return "0.0.0.0";
+        }
+        closesocket(s);
+        char buf[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &local.sin_addr, buf, sizeof(buf));
+        return buf;
+    }
+#else
+    std::string get_local_ip() { return "0.0.0.0"; }
+#endif
+
+    void lan_scan_thread(std::atomic<uint32_t>* scan_result, std::atomic<bool>* scanning)
+    {
+#ifdef _WIN32
+        // Bind to a fixed port to receive broadcast beacons
+        SOCKET s = socket(AF_INET, SOCK_DGRAM, 0);
+        if (s == INVALID_SOCKET) { *scanning = false; return; }
+        BOOL yes = TRUE;
+        setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (char*)&yes, sizeof(yes));
+
+        sockaddr_in local{};
+        local.sin_family = AF_INET;
+        local.sin_port   = htons(6970);
+        local.sin_addr.s_addr = INADDR_ANY;
+        if (bind(s, (sockaddr*)&local, sizeof(local)) != 0) {
+            closesocket(s);
+            *scanning = false;
+            return;
+        }
+
+        // Set non-blocking so we can poll with timeout
+        u_long nb = 1;
+        ioctlsocket(s, FIONBIO, &nb);
+
+        auto t0 = std::chrono::steady_clock::now();
+        char buf[64];
+        sockaddr_in from{};
+        int fl = sizeof(from);
+
+        while (std::chrono::duration<float>(std::chrono::steady_clock::now() - t0).count() < 2.0f) {
+            int n = recvfrom(s, buf, sizeof(buf), 0, (sockaddr*)&from, &fl);
+            if (n == 4 && std::memcmp(buf, "ECS1", 4) == 0) {
+                // Found a routing server beacon — store the source IP
+                uint32_t expected = 0;
+                if (scan_result->compare_exchange_strong(expected, from.sin_addr.s_addr)) {
+                    char buf2[INET_ADDRSTRLEN];
+                    inet_ntop(AF_INET, &from.sin_addr, buf2, sizeof(buf2));
+                    std::cout << "[Scan] Found routing server at "
+                              << buf2 << ":6969\n";
+                }
+                break;
+            }
+            fl = sizeof(from); // reset addr length
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        closesocket(s);
+#endif
+        *scanning = false;
+    }
 } // anonymous
 
 //------------------------------------------------------------------------------
@@ -49,11 +131,17 @@ SpaceGameApp::SpaceGameApp()
     : window(nullptr), world(nullptr),
       ip(Core::octets_into_ip({127, 0, 0, 1})), port(6969)
 {
+    Core::ensure_udp_firewall_rule("ECS SpaceGame");
+
     std::mt19937 rng{ std::random_device{}() };
     m_local_player_id = std::uniform_int_distribution(1u, UINT32_MAX)(rng);
     std::cout << "[Net] Local player_id = " << m_local_player_id << '\n';
 
     this->peer.init();
+
+    // Detect local LAN IP for display in the Host panel
+    m_local_ip_str = get_local_ip();
+    std::cout << "[Net] Local LAN IP: " << m_local_ip_str << '\n';
 }
 
 //------------------------------------------------------------------------------
@@ -205,7 +293,8 @@ void SpaceGameApp::ProcessNetEvents() {
         }
         break;
 
-        case fb::Message_PlayerDeath:
+        case fb::Message_PlayerDeath: {
+        }
         break;
 
         case fb::Message_PlayerRespawn: {
@@ -480,7 +569,12 @@ void SpaceGameApp::Run() {
 //------------------------------------------------------------------------------
 /**
 */
-void SpaceGameApp::Exit() { this->window->Close(); }
+void SpaceGameApp::Exit() {
+    this->window->Close();
+    if (this->server.m_initialized) {
+        this->server.deinit();
+    }
+}
 
 //------------------------------------------------------------------------------
 /**
@@ -501,6 +595,7 @@ void SpaceGameApp::RenderUI() {
 
         ImGui::Separator();
         ImGui::Text("Network  (player_id: %u)", m_local_player_id);
+        ImGui::Text("My LAN IP: %s  (share with other players)", m_local_ip_str.c_str());
         ImGui::Text("P2P peers connected: %d", (int)peer.m_peers.size());
 
         std::array<int, 4> octets = Core::ip_into_octets(this->ip);
@@ -511,32 +606,63 @@ void SpaceGameApp::RenderUI() {
         if (ImGui::InputInt("Port", &p))
             this->port = static_cast<uint16_t>(p & 0xFFFF);
 
-        if (ImGui::Button("Host")) {
-            if (this->m_server_thread.joinable()) {
-                this->m_server_stop = true;
-                this->m_server_thread.join();
-                this->server.deinit();
-            }
-            this->m_server_stop = false;
+        if (!this->server.m_live && !this->peer.is_live()) {
+            if (ImGui::Button("Host")) {
+                // if (this->m_server_thread.joinable()) {
+                //     this->m_server_stop = true;
+                //     this->server.m_live = true;
+                //     this->m_server_thread.join();
+                //     this->server.deinit();
+                // }
+                // this->m_server_stop = false;
 
-            if (this->server.init(this->port)) {
-                std::cout << "[Host] Routing server listening on port " << this->port << '\n';
-                this->m_server_thread = std::thread([this]() {
-                    while (!this->m_server_stop.load(std::memory_order_relaxed))
-                        this->server.update();
-                });
-                if (!this->peer.connect(this->ip, this->port))
-                    std::cout << "[Host] peer.connect() initiation failed\n";
-            } else {
-                std::cout << "[Host] Failed to start server on port " << this->port << '\n';
+                if (this->server.init(this->port)) {
+                    std::cout << "[Host] Routing server listening on port " << this->port << '\n';
+                    this->m_server_thread = std::thread([this]() {
+                        this->server.m_live = true;
+                        while (!this->m_server_stop.load(std::memory_order_relaxed))
+                            this->server.update();
+                    });
+                    if (!this->peer.connect(Core::octets_into_ip({127, 0, 0, 1}), this->port))
+                        std::cout << "[Host] peer.connect() initiation failed\n";
+                } else {
+                    std::cout << "[Host] Failed to start server on port " << this->port << '\n';
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Connect")) {
+                std::cout << "[Peer] Connecting to "
+                          << Core::ip_into_octets(this->ip) << ':' << this->port << '\n';
+                this->peer.connect(this->ip, this->port);
+            }
+        } else {
+            if (ImGui::Button("Disconnect")) {
+                std::cout << "[Peer] Disconnecting\n";
+                if (this->m_server_thread.joinable()) {
+                    this->m_server_stop = true;
+                    this->server.m_live = false;
+                    this->m_server_thread.join();
+                    // this->server.deinit();
+                }
+                this->m_server_stop = false;
+                for (auto [fst, snd] : m_remote_peers) {
+                    world->DestroyEntity(snd.ghost_ship);
+                    m_remote_peers.erase(fst);
+                    std::cout << "[Game] PlayerLeft: removed ghost ship\n";
+                }
+                this->peer.disconnect();
             }
         }
-        ImGui::SameLine();
-        if (ImGui::Button("Connect")) {
-            std::cout << "[Connect] Connecting to "
-                      << Core::ip_into_octets(this->ip) << ':' << this->port << '\n';
-            this->peer.connect(this->ip, this->port);
-        }
+
+        // if (!m_scanning.load() && ImGui::Button("Scan LAN")) {
+        //     m_scanning = true;
+        //     std::cout << "[Scan] Scanning for routing servers on LAN...\n";
+        //     std::thread(lan_scan_thread, &m_scan_ip, &m_scanning).detach();
+        // }
+        // if (m_scanning.load()) {
+        //     ImGui::SameLine();
+        //     ImGui::TextColored(ImVec4(1,1,0,1), "Scanning...");
+        // }
 
         ImGui::End();
         Debug::DispatchDebugTextDrawing();

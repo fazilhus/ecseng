@@ -10,7 +10,7 @@
 
 namespace Core {
     server::server()
-        : m_initialized(false), m_port(6969), m_host(nullptr), m_peers({}) {}
+        : m_initialized(false), m_live(false), m_port(6969), m_host(nullptr), m_peers({}) {}
 
     server::~server() { deinit(); }
 
@@ -250,6 +250,10 @@ namespace Core {
                 break;
             }
         }
+    }
+
+    bool peer::is_live() const {
+        return m_peers.size() != 0;
     }
 
     std::array<int, 4> ip_into_octets(const uint32_t ip) {

@@ -32,6 +32,7 @@ namespace Core {
         void update();
 
         bool m_initialized;
+        bool m_live;
         uint16_t m_port;
         ENetHost* m_host;
         std::vector<ENetPeer*> m_peers;
@@ -49,6 +50,8 @@ namespace Core {
         void disconnect();
 
         void update();
+
+        bool is_live() const;
 
         bool m_initialized;
         ENetHost* m_host;

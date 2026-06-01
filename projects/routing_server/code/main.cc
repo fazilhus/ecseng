@@ -5,11 +5,19 @@
 //------------------------------------------------------------------------------
 #include "net.h"
 #include "test_client.h"
+#include "firewall.h"
 
 #include <atomic>
 #include <csignal>
 #include <cstring>
 #include <iostream>
+#include <thread>
+#include <chrono>
+
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#endif
 
 
 static std::atomic<bool> g_running{true};
@@ -41,6 +49,9 @@ int main(int argc, char* argv[]) {
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
 
+    // Allow inbound UDP through Windows Firewall (LAN play)
+    Core::ensure_udp_firewall_rule("ECS RoutingServer");
+
     Core::server srv;
     if (!srv.init(port)) {
         std::cerr << "[RoutingServer] Failed to initialize on port " << port << '\n';
@@ -50,11 +61,32 @@ int main(int argc, char* argv[]) {
     std::cout << "[RoutingServer] Listening on port " << port << '\n';
     std::cout << "[RoutingServer] Press Ctrl+C to stop.\n";
 
+    // LAN discovery: broadcast beacon every 2 s on UDP 6970
+    std::thread disc_thread([&]() {
+#ifdef _WIN32
+        SOCKET s = socket(AF_INET, SOCK_DGRAM, 0);
+        if (s == INVALID_SOCKET) return;
+        BOOL yes = TRUE;
+        setsockopt(s, SOL_SOCKET, SO_BROADCAST, (char*)&yes, sizeof(yes));
+        sockaddr_in dst{};
+        dst.sin_family = AF_INET;
+        dst.sin_port   = htons(6970);
+        dst.sin_addr.s_addr = INADDR_BROADCAST;
+        const char* beacon = "ECS1";
+        while (g_running.load()) {
+            sendto(s, beacon, 4, 0, (sockaddr*)&dst, sizeof(dst));
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+        }
+        closesocket(s);
+#endif
+    });
+
     while (g_running.load()) {
         srv.update();
     }
 
     std::cout << "\n[RoutingServer] Shutting down...\n";
+    if (disc_thread.joinable()) disc_thread.join();
     srv.deinit();
 
     return 0;

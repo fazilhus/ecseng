@@ -40,12 +40,12 @@ namespace Game {
         void Broadcast(const flatbuffers::FlatBufferBuilder& fbb, bool reliable);
 
         Display::Window* window = nullptr;
-        Ecs::World*      world  = nullptr;
+        Ecs::World* world  = nullptr;
 
-        Core::peer   peer;
+        Core::peer peer;
         Core::server server;
-        std::thread         m_server_thread;
-        std::atomic<bool>   m_server_stop{false};
+        std::thread m_server_thread;
+        std::atomic<bool> m_server_stop{false};
         uint32_t ip;
         uint16_t port;
 
@@ -55,8 +55,9 @@ namespace Game {
         uint8_t m_proj_counter = 0;
         std::unordered_map<ENetPeer*, RemotePeer> m_remote_peers;
         Ecs::EntityID m_ship = 0;
-        Render::ModelId         m_laser_model{};
+        Render::ModelId m_laser_model{};
         Physics::ColliderMeshId m_laser_cmesh{};
+        std::string m_local_ip_str;
     };
 
 } // namespace Game
