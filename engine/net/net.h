@@ -17,7 +17,7 @@ inline std::ostream& operator<<(std::ostream& os, std::array<int, 4> ip_octets) 
 namespace Core {
 
     struct incoming_msg {
-        ENetPeer*            from;
+        ENetPeer* from;
         std::vector<uint8_t> data;
     };
 

@@ -190,8 +190,7 @@ void SpaceGameApp::ProcessNetEvents() {
     for (ENetPeer* ep : peer.m_connected_peers) {
         {
             flatbuffers::FlatBufferBuilder fbb;
-            auto name = fbb.CreateString("");
-            auto join = fb::CreatePlayerJoin(fbb, m_local_player_id, name);
+            auto join = fb::CreatePlayerJoin(fbb, m_local_player_id);
             auto env  = fb::CreateEnvelope(fbb, fb::Message_PlayerJoin, join.Union());
             fbb.Finish(env);
             ENetPacket* pkt = enet_packet_create(
@@ -608,14 +607,6 @@ void SpaceGameApp::RenderUI() {
 
         if (!this->server.m_live && !this->peer.is_live()) {
             if (ImGui::Button("Host")) {
-                // if (this->m_server_thread.joinable()) {
-                //     this->m_server_stop = true;
-                //     this->server.m_live = true;
-                //     this->m_server_thread.join();
-                //     this->server.deinit();
-                // }
-                // this->m_server_stop = false;
-
                 if (this->server.init(this->port)) {
                     std::cout << "[Host] Routing server listening on port " << this->port << '\n';
                     this->m_server_thread = std::thread([this]() {
@@ -635,6 +626,21 @@ void SpaceGameApp::RenderUI() {
                           << Core::ip_into_octets(this->ip) << ':' << this->port << '\n';
                 this->peer.connect(this->ip, this->port);
             }
+            ImGui::SameLine();
+            if (!m_scanning.load() && ImGui::Button("Scan LAN")) {
+                m_scanning = true;
+                m_ip_found = false;
+                std::cout << "[Scan] Scanning for routing servers on LAN...\n";
+                std::thread(lan_scan_thread, &m_scan_ip, &m_scanning).detach();
+            }
+            if (m_scanning.load()) {
+                ImGui::SameLine();
+                ImGui::TextColored(ImVec4(1,1,0,1), "Scanning...");
+            }
+            if (m_ip_found.load()) {
+                this->ip = m_scan_ip.load();
+                m_ip_found = false;
+            }
         } else {
             if (ImGui::Button("Disconnect")) {
                 std::cout << "[Peer] Disconnecting\n";
@@ -642,27 +648,16 @@ void SpaceGameApp::RenderUI() {
                     this->m_server_stop = true;
                     this->server.m_live = false;
                     this->m_server_thread.join();
-                    // this->server.deinit();
                 }
                 this->m_server_stop = false;
-                for (auto [fst, snd] : m_remote_peers) {
-                    world->DestroyEntity(snd.ghost_ship);
-                    m_remote_peers.erase(fst);
+                for (auto it : m_remote_peers) {
+                    if (it.first == nullptr) continue;
+                    world->DestroyEntity(it.second.ghost_ship);
                     std::cout << "[Game] PlayerLeft: removed ghost ship\n";
                 }
                 this->peer.disconnect();
             }
         }
-
-        // if (!m_scanning.load() && ImGui::Button("Scan LAN")) {
-        //     m_scanning = true;
-        //     std::cout << "[Scan] Scanning for routing servers on LAN...\n";
-        //     std::thread(lan_scan_thread, &m_scan_ip, &m_scanning).detach();
-        // }
-        // if (m_scanning.load()) {
-        //     ImGui::SameLine();
-        //     ImGui::TextColored(ImVec4(1,1,0,1), "Scanning...");
-        // }
 
         ImGui::End();
         Debug::DispatchDebugTextDrawing();

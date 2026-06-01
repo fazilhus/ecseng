@@ -19,8 +19,8 @@
 namespace Game {
 
     struct RemotePeer {
-        ENetPeer*     enet_peer  = nullptr;
-        uint32_t      player_id  = 0;
+        ENetPeer* enet_peer  = nullptr;
+        uint32_t player_id  = 0;
         Ecs::EntityID ghost_ship = 0;
     };
 
@@ -58,6 +58,9 @@ namespace Game {
         Render::ModelId m_laser_model{};
         Physics::ColliderMeshId m_laser_cmesh{};
         std::string m_local_ip_str;
+        std::atomic<uint32_t> m_scan_ip;
+        std::atomic<bool> m_scanning;
+        std::atomic<bool> m_ip_found;
     };
 
 } // namespace Game

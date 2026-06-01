@@ -15,7 +15,6 @@ struct Quat {
 
 table PlayerJoin {
     player_id: uint;
-    name: string;
 }
 
 table PlayerLeft {
@@ -40,11 +39,6 @@ table EntityState {
     timestamp: uint;
 }
 
-table BatchState {
-    entity_states: [EntityState];
-}
-
-// Routing / coordination messages
 struct PeerAddress {
     host: uint32;
     port: uint16;
@@ -64,7 +58,6 @@ union Message {
     PlayerDeath,
     PlayerRespawn,
     EntityState,
-    BatchState,
     PeerList,
     NewPeer,
 }

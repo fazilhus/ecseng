@@ -185,7 +185,7 @@ namespace Core {
                 } else {
                     std::cout << "[Peer] Connected to P2P peer at " << ip << '\n';
                     m_peers.emplace_back(e.peer);
-                    m_connected_peers.emplace_back(e.peer);   // notify game layer
+                    m_connected_peers.emplace_back(e.peer);
                 }
             }
             break;
@@ -196,7 +196,7 @@ namespace Core {
                 } else if (auto it = std::ranges::find(m_peers, e.peer);
                            it != m_peers.end()) {
                     m_peers.erase(it);
-                    m_disconnected_peers.emplace_back(e.peer); // notify game layer
+                    m_disconnected_peers.emplace_back(e.peer);
                 }
             }
             break;
